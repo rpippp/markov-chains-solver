@@ -1,0 +1,24 @@
+# Markov Chain Studio
+
+> Free online interactive Markov chain solver and simulator for finite discrete-time Markov chains.
+
+Canonical URL: https://markov-chains-solver.vercel.app/
+Source repository: https://github.com/rpippp/markov-chains-solver
+
+## What It Does
+
+- Visual Markov chain graph editing with states, directed edges, and transition probabilities.
+- Exact calculations for hitting probabilities, expected hitting times, stationary distributions, and state classification.
+- Animated random walk simulation and Monte Carlo estimates for validating exact answers.
+- Transition matrix editing plus CSV and LaTeX export.
+- Single dependency-free HTML application that runs locally in any modern browser.
+
+## Useful Search Queries
+
+- markov chain solver
+- markov chain calculator
+- stationary distribution calculator
+- hitting probability calculator
+- expected hitting time Markov chain
+- absorbing Markov chain calculator
+- transition matrix calculator

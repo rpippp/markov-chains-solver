@@ -69,6 +69,10 @@ This repository is ready for Vercel: `index.html` is the deploy entry point, whi
 - **Locally:** just open the file — no server needed.
 - **GitHub Pages:** rename the file to `index.html`, enable Pages in the repository settings, and the app is live.
 
+## Search setup
+
+The production URL used for canonical tags, `robots.txt`, `sitemap.xml`, and `llms.txt` is `https://markov-chains-solver.vercel.app/`. If Vercel assigns a different production domain or you add a custom domain, update those files before submitting the sitemap in Google Search Console.
+
 ## Correctness
 
 Self-tests run on every page load (see the browser console) and cover: hitting probabilities and expected times on an 11-state pattern-matching chain (exact fractional values), Gambler's ruin, a closed-form stationary distribution, the period of a cycle, and infinite-expected-time detection. Run them manually with `runMarkovSelfTests()` in the console.

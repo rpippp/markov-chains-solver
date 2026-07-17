@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://markov-chains-solver.vercel.app/sitemap.xml
