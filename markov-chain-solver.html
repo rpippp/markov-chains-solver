@@ -1,0 +1,2950 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Markov Chain Studio — visual editor, exact solver, distributions and simulation for finite Markov chains. A single dependency-free HTML file.">
+<title>Markov Chain Studio — Solver &amp; Simulator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Ccircle%20cx='18'%20cy='19'%20r='11'%20fill='%232a78d6'/%3E%3Ccircle%20cx='47'%20cy='31'%20r='11'%20fill='%233987e5'%20opacity='.75'/%3E%3Ccircle%20cx='23'%20cy='47'%20r='11'%20fill='%231c5cab'/%3E%3C/svg%3E">
+<script>
+(function(){
+  try{
+    var saved = JSON.parse(localStorage.getItem("markov-studio-v1") || "null");
+    var t = saved && saved.ui && saved.ui.theme;
+    if(t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.dataset.theme = t;
+  }catch(e){ document.documentElement.dataset.theme = "light"; }
+})();
+</script>
+<style>
+/* ============================== tokens ============================== */
+:root{
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --tab-h: 42px;
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg: #f3f5f9;
+  --surface: #ffffff;
+  --surface-2: #f1f4f8;
+  --surface-3: #e6ebf2;
+  --ink: #101828;
+  --ink-2: #414f63;
+  --muted: #64748b;
+  --line: #e2e7ef;
+  --line-2: #c6d0de;
+  --accent: #256abf;
+  --on-accent: #ffffff;
+  --accent-text: #1c5cab;
+  --accent-soft: rgba(42,120,214,.10);
+  --accent-ring: rgba(42,120,214,.35);
+  --ok-text: #067647;   --ok-bg: #e9f7ef;             --ok-line: #b3e2c4;
+  --warn-text: #935300; --warn-bg: #fdf4e3;           --warn-line: #edd6a4;
+  --bad-text: #b42318;  --bad-bg: #fdedeb;            --bad-line: #f2b8b1;
+  --s1:#2a78d6; --s2:#008300; --s3:#e87ba4; --s4:#eda100;
+  --s5:#1baf7a; --s6:#eb6834; --s7:#4a3aa7; --s8:#e34948;
+  --s-other:#898781;
+  --grid-line: #eaedf3;
+  --axis: #c6d0de;
+  --canvas-bg-1: #fbfcff;
+  --canvas-bg-2: #f1f5fa;
+  --canvas-dot: #c8d3e1;
+  --halo: #f8fafd;
+  --node-fill: #ffffff;
+  --node-stroke: #8298b1;
+  --edge: #5c7089;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 8px 24px rgba(16,24,40,.07);
+  --shadow-pop: 0 12px 40px rgba(16,24,40,.18);
+  --scrim: rgba(16,24,40,.45);
+  --heat-lo: #f2f7fe;
+  --heat-hi: #7eb1ec;
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg: #0b101b;
+  --surface: #121a29;
+  --surface-2: #182235;
+  --surface-3: #223048;
+  --ink: #edf1f8;
+  --ink-2: #b0bccf;
+  --muted: #7f8da6;
+  --line: rgba(148,163,190,.16);
+  --line-2: rgba(148,163,190,.30);
+  --accent: #3987e5;
+  --on-accent: #071019;
+  --accent-text: #6aa6ef;
+  --accent-soft: rgba(57,135,229,.16);
+  --accent-ring: rgba(57,135,229,.45);
+  --ok-text: #58c87e;   --ok-bg: rgba(18,168,84,.14);  --ok-line: rgba(88,200,126,.35);
+  --warn-text: #e2b25c; --warn-bg: rgba(250,178,25,.12); --warn-line: rgba(226,178,92,.35);
+  --bad-text: #f08a80;  --bad-bg: rgba(208,59,59,.15);  --bad-line: rgba(240,138,128,.40);
+  --s1:#3987e5; --s2:#008300; --s3:#d55181; --s4:#c98500;
+  --s5:#199e70; --s6:#d95926; --s7:#9085e9; --s8:#e66767;
+  --s-other:#898781;
+  --grid-line: rgba(148,163,190,.10);
+  --axis: rgba(148,163,190,.28);
+  --canvas-bg-1: #0e1524;
+  --canvas-bg-2: #0b111d;
+  --canvas-dot: rgba(148,163,190,.16);
+  --halo: #0d1422;
+  --node-fill: #1b2740;
+  --node-stroke: #5b6c88;
+  --edge: #7487a1;
+  --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 30px rgba(0,0,0,.30);
+  --shadow-pop: 0 16px 48px rgba(0,0,0,.55);
+  --scrim: rgba(2,6,14,.62);
+  --heat-lo: #16203444;
+  --heat-hi: #2f6ab8;
+}
+
+/* ============================== base ============================== */
+*{ box-sizing:border-box; }
+[hidden]{ display:none !important; }
+html,body{ height:100%; }
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--sans); font-size:14.5px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{ margin:0; font-weight:650; letter-spacing:-.01em; }
+p{ margin:0; }
+button,input,select,output{ font:inherit; color:inherit; }
+button{ cursor:pointer; touch-action:manipulation; background:none; border:0; padding:0; }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+::selection{ background:var(--accent-soft); }
+.visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.icon{ width:17px; height:17px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; flex:0 0 auto; }
+.icon.filled{ fill:currentColor; stroke:none; }
+
+/* ============================== app frame ============================== */
+.app{ height:100dvh; display:grid; grid-template-rows:auto minmax(0,1fr); }
+.topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:0 16px; height:56px; background:var(--surface);
+  border-bottom:1px solid var(--line); position:relative; z-index:20;
+}
+.brand{ display:flex; align-items:center; gap:10px; min-width:0; }
+.brand-mark{
+  width:32px; height:32px; border-radius:9px; flex:0 0 auto;
+  background:linear-gradient(135deg, var(--accent), var(--accent-text));
+  display:grid; place-items:center; color:#fff;
+}
+.brand-mark .icon{ width:18px; height:18px; }
+.brand h1{ font-size:15.5px; white-space:nowrap; }
+.brand-sub{ display:block; font-size:11.5px; color:var(--muted); margin-top:-2px; white-space:nowrap; }
+.top-actions{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.divider{ width:1px; height:22px; background:var(--line); margin:0 4px; }
+.preset-select{
+  min-height:38px; padding:6px 10px; border:1px solid var(--line-2); border-radius:var(--radius);
+  background:var(--surface); color:var(--ink); max-width:220px; cursor:pointer;
+}
+
+/* buttons */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  min-height:38px; padding:7px 13px; border-radius:var(--radius);
+  border:1px solid var(--line-2); background:var(--surface); color:var(--ink);
+  font-weight:550; transition:background .15s ease, border-color .15s ease, transform .08s ease;
+}
+.btn:hover{ background:var(--surface-2); }
+.btn:active{ transform:translateY(1px); }
+.btn:disabled{ opacity:.5; cursor:not-allowed; transform:none; }
+.btn.primary{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.btn.primary:hover{ filter:brightness(1.06); background:var(--accent); }
+.btn.ghost{ border-color:transparent; background:transparent; }
+.btn.ghost:hover{ background:var(--surface-2); }
+.btn.danger{ color:var(--bad-text); }
+.btn.danger:hover{ background:var(--bad-bg); border-color:var(--bad-line); }
+.btn.small{ min-height:32px; padding:4px 10px; font-size:13px; }
+.btn[aria-pressed="true"]{ background:var(--accent-soft); border-color:var(--accent-ring); color:var(--accent-text); }
+.icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:38px; height:38px; border-radius:var(--radius);
+  border:1px solid transparent; color:var(--ink-2);
+  transition:background .15s ease, color .15s ease;
+}
+.icon-btn:hover{ background:var(--surface-2); color:var(--ink); }
+.icon-btn:disabled{ opacity:.4; cursor:not-allowed; }
+.icon-btn.on{ background:var(--accent-soft); color:var(--accent-text); border-color:var(--accent-ring); }
+@media (pointer:coarse){
+  .btn, .icon-btn{ min-height:44px; }
+  .icon-btn{ width:44px; height:44px; }
+}
+
+/* ============================== shell ============================== */
+.shell{
+  display:grid; grid-template-columns:minmax(0,1fr) 408px; gap:14px;
+  padding:14px; min-height:0;
+}
+.panel{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow); min-height:0; display:flex; flex-direction:column; overflow:hidden;
+}
+
+/* ============================== canvas ============================== */
+.canvas-toolbar{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  padding:10px 12px; border-bottom:1px solid var(--line);
+}
+.tool-group{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.graph-wrap{
+  position:relative; flex:1; min-height:0; overflow:hidden;
+  background:
+    radial-gradient(circle at 1px 1px, var(--canvas-dot) 1px, transparent 1.6px) 0 0 / 26px 26px,
+    linear-gradient(180deg, var(--canvas-bg-1), var(--canvas-bg-2));
+}
+svg#graph{ display:block; width:100%; height:100%; touch-action:none; cursor:default; }
+svg#graph.panning{ cursor:grabbing; }
+svg#graph.connecting{ cursor:crosshair; }
+
+.edge-path{ fill:none; stroke:var(--edge); transition:stroke .15s ease; }
+.edge-hit{ fill:none; stroke:transparent; stroke-width:20; cursor:pointer; }
+.edge.selected .edge-path{ stroke:var(--accent); }
+.edge.traversed .edge-path{ stroke:var(--accent); }
+.edge-label{
+  font-family:var(--mono); font-size:12.5px; font-weight:700; fill:var(--ink);
+  paint-order:stroke; stroke:var(--halo); stroke-width:5px; stroke-linejoin:round;
+  pointer-events:none;
+}
+.draft-edge{ fill:none; stroke:var(--accent); stroke-width:2; stroke-dasharray:6 5; pointer-events:none; }
+
+.node{ cursor:grab; }
+.node:active{ cursor:grabbing; }
+.node circle.base{
+  fill:var(--node-fill); stroke:var(--node-stroke); stroke-width:2;
+  transition:stroke .15s ease, fill .2s ease;
+}
+.node.selected circle.base{ stroke:var(--accent); stroke-width:3.5; }
+.node.is-x circle.base{ stroke:var(--ok-text); }
+.node.is-y circle.base{ stroke:var(--bad-text); }
+.node.connect-src circle.base{ stroke:var(--accent); stroke-dasharray:5 4; }
+.start-ring{ display:none; fill:none; stroke:var(--accent); stroke-width:2; stroke-dasharray:5 4; }
+.node.is-start .start-ring{ display:block; }
+.node text.label{
+  font-size:14px; font-weight:700; fill:var(--ink); text-anchor:middle;
+  dominant-baseline:middle; pointer-events:none;
+}
+.node text.value{
+  font-family:var(--mono); font-size:10.5px; fill:var(--ink-2); text-anchor:middle;
+  dominant-baseline:middle; pointer-events:none;
+}
+.node-badge rect{ fill:var(--surface); stroke-width:1.5; }
+.node-badge text{ font-size:10px; font-weight:800; text-anchor:middle; dominant-baseline:middle; }
+.node-badge.bx rect{ stroke:var(--ok-text); } .node-badge.bx text{ fill:var(--ok-text); }
+.node-badge.by rect{ stroke:var(--bad-text); } .node-badge.by text{ fill:var(--bad-text); }
+.pulse-ring{ display:none; fill:none; stroke:var(--accent); stroke-width:3; opacity:.8; }
+.node.is-current .pulse-ring{ display:block; animation:pulse 1.4s ease-out infinite; }
+@keyframes pulse{
+  0%{ stroke-width:4; r:34; opacity:.75; }
+  70%{ stroke-width:1; r:46; opacity:0; }
+  100%{ opacity:0; }
+}
+#sim-token circle.tk-ring{ fill:var(--surface); }
+#sim-token circle.tk{ fill:var(--accent); }
+
+.sim-hud{
+  position:absolute; top:12px; left:12px; display:flex; align-items:center; gap:8px;
+  padding:7px 12px; border-radius:999px; background:var(--surface); border:1px solid var(--line);
+  box-shadow:var(--shadow); font-size:13px; font-weight:600; pointer-events:none;
+}
+.sim-hud .dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); }
+.sim-hud .mono{ font-family:var(--mono); }
+
+.inline-editor{ position:absolute; z-index:5; }
+.inline-editor input{
+  width:76px; padding:5px 8px; font-family:var(--mono); font-size:13.5px; text-align:center;
+  border:1.5px solid var(--accent); border-radius:8px; background:var(--surface); color:var(--ink);
+  box-shadow:var(--shadow-pop);
+}
+
+.zoom-note{
+  position:absolute; bottom:10px; right:12px; font-size:11.5px; color:var(--muted);
+  font-family:var(--mono); pointer-events:none;
+}
+
+/* inspector */
+.inspector{
+  border-top:1px solid var(--line); padding:9px 12px; min-height:58px;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--surface);
+}
+.insp-kind{
+  display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+  padding:3px 9px; border:1px solid var(--line); border-radius:999px; white-space:nowrap;
+}
+.insp-field{ display:flex; align-items:center; gap:7px; font-size:13px; color:var(--ink-2); }
+.insp-field input{
+  min-height:34px; padding:4px 9px; border:1px solid var(--line-2); border-radius:var(--radius);
+  background:var(--surface); color:var(--ink);
+}
+.insp-field input[type="text"]{ width:110px; }
+.insp-field input[type="number"]{ width:86px; font-family:var(--mono); }
+.insp-actions{ display:flex; align-items:center; gap:6px; margin-left:auto; flex-wrap:wrap; }
+.role-btn{
+  display:inline-flex; align-items:center; gap:5px; min-height:34px; padding:4px 11px;
+  border-radius:999px; border:1px solid var(--line-2); font-size:12.5px; font-weight:650;
+  background:var(--surface); color:var(--ink-2); transition:all .15s ease;
+}
+.role-btn:hover{ background:var(--surface-2); }
+.role-btn.on-start{ background:var(--accent-soft); border-color:var(--accent-ring); color:var(--accent-text); }
+.role-btn.on-x{ background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok-text); }
+.role-btn.on-y{ background:var(--bad-bg); border-color:var(--bad-line); color:var(--bad-text); }
+.insp-hint{ font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.insp-hint b{ font-weight:650; color:var(--ink-2); }
+.insp-sum{ font-family:var(--mono); font-size:12.5px; }
+
+/* ============================== side panel ============================== */
+.side-panel{ min-width:0; }
+.side-head{ border-bottom:1px solid var(--line); padding:0 12px; display:flex; align-items:center; gap:8px; }
+.tabs{ display:flex; flex:1; min-width:0; }
+.tab-btn{
+  flex:1; min-height:var(--tab-h); padding:8px 4px; font-size:13.5px; font-weight:600;
+  color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px;
+  white-space:nowrap; transition:color .15s ease;
+}
+.tab-btn:hover{ color:var(--ink); }
+.tab-btn[aria-selected="true"]{ color:var(--accent-text); border-bottom-color:var(--accent); }
+.side-body{ flex:1; min-height:0; overflow-y:auto; padding:14px; scrollbar-gutter:stable; }
+.tab-panel{ display:none; }
+.tab-panel.active{ display:block; }
+
+.pill{
+  display:inline-flex; align-items:center; gap:5px; min-height:24px; padding:2px 10px;
+  border:1px solid var(--line); border-radius:999px; font-size:12px; font-weight:700;
+  color:var(--muted); background:var(--surface); white-space:nowrap; flex:0 0 auto;
+}
+.pill .icon{ width:13px; height:13px; }
+.pill.ok{ color:var(--ok-text); background:var(--ok-bg); border-color:var(--ok-line); }
+.pill.warn{ color:var(--warn-text); background:var(--warn-bg); border-color:var(--warn-line); }
+.pill.bad{ color:var(--bad-text); background:var(--bad-bg); border-color:var(--bad-line); }
+.pill.accent{ color:var(--accent-text); background:var(--accent-soft); border-color:var(--accent-ring); }
+
+.field{ display:grid; gap:6px; margin-bottom:14px; }
+.field-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end; }
+.label, label.label{
+  font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted);
+}
+select, input[type="number"], input[type="text"]{
+  min-height:38px; padding:7px 10px; border:1px solid var(--line-2); border-radius:var(--radius);
+  background:var(--surface); color:var(--ink); width:100%;
+}
+input[type="range"]{ width:100%; accent-color:var(--accent); min-height:28px; }
+input[type="checkbox"]{ accent-color:var(--accent); }
+
+.seg{
+  display:grid; grid-template-columns:1fr 1fr; gap:3px; padding:3px;
+  background:var(--surface-2); border:1px solid var(--line); border-radius:10px; margin-bottom:8px;
+}
+.seg-btn{
+  min-height:36px; padding:6px 8px; border-radius:8px; font-size:13px; font-weight:600;
+  color:var(--muted); transition:all .15s ease;
+}
+.seg-btn:hover{ color:var(--ink); }
+.seg-btn.active{ background:var(--surface); color:var(--accent-text); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+
+.chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+.chip{
+  display:inline-flex; align-items:center; gap:5px; min-height:32px; padding:4px 12px;
+  border:1px solid var(--line-2); border-radius:999px; background:var(--surface);
+  font-size:13px; font-weight:600; color:var(--ink-2); transition:all .15s ease;
+}
+.chip:hover{ background:var(--surface-2); }
+.chip:disabled{ opacity:.45; cursor:not-allowed; }
+.chip.on-x{ background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok-text); }
+.chip.on-y{ background:var(--bad-bg); border-color:var(--bad-line); color:var(--bad-text); }
+.chip .icon{ width:13px; height:13px; }
+.chip.mini{ min-height:26px; padding:2px 10px; font-size:12.5px; }
+
+.switch-row{ display:flex; align-items:flex-start; gap:9px; margin:10px 0; cursor:pointer; font-size:13px; color:var(--ink-2); }
+.switch-row input{ position:absolute; opacity:0; width:1px; height:1px; }
+.switch{
+  flex:0 0 auto; width:34px; height:20px; border-radius:999px; background:var(--line-2);
+  position:relative; transition:background .18s ease; margin-top:1px;
+}
+.switch::after{
+  content:""; position:absolute; top:2.5px; left:3px; width:15px; height:15px; border-radius:50%;
+  background:var(--surface); box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .18s ease;
+}
+.switch-row input:checked + .switch{ background:var(--accent); }
+.switch-row input:checked + .switch::after{ transform:translateX(13px); }
+.switch-row input:focus-visible + .switch{ outline:2px solid var(--accent); outline-offset:2px; }
+
+.hint{ font-size:12.5px; color:var(--muted); }
+.block-title{ font-size:13px; font-weight:700; margin:20px 0 9px; display:flex; align-items:center; gap:8px; }
+.block-title:first-child{ margin-top:0; }
+.block-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:20px 0 9px; flex-wrap:wrap; }
+.block-head:first-child{ margin-top:0; }
+.block-head h3{ font-size:13px; font-weight:700; }
+.block-head .tool-group{ gap:5px; }
+
+.message{
+  display:flex; gap:9px; align-items:flex-start; padding:10px 12px; border-radius:var(--radius);
+  border:1px solid var(--line); background:var(--surface-2); color:var(--ink-2); font-size:13px;
+}
+.message .icon{ margin-top:2px; }
+.message.error{ background:var(--bad-bg); border-color:var(--bad-line); color:var(--bad-text); }
+.message.warn{ background:var(--warn-bg); border-color:var(--warn-line); color:var(--warn-text); }
+.message.ok{ background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok-text); }
+
+/* result card */
+.result-card{
+  margin-top:14px; padding:14px; border:1px solid var(--line); border-radius:var(--radius-lg);
+  background:linear-gradient(180deg, var(--surface), var(--surface-2));
+}
+.result-label{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+.result-hero{ font-size:clamp(26px, 3.2vw, 34px); font-weight:700; letter-spacing:-.02em; margin:2px 0 4px; overflow-wrap:anywhere; }
+.result-note{ font-size:12.5px; color:var(--muted); }
+.result-meta{ font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-top:8px; }
+
+/* bar lists (dataviz) */
+.bars{ display:grid; gap:7px; margin-top:10px; }
+.bar-row{ display:grid; grid-template-columns:88px minmax(0,1fr) 62px; gap:9px; align-items:center; }
+.bar-label{
+  font-size:12.5px; font-weight:600; color:var(--ink-2); overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; text-align:right;
+}
+.bar-track{ height:12px; border-radius:0 4px 4px 0; background:var(--accent-soft); overflow:hidden; }
+.bar-fill{ display:block; height:100%; border-radius:0 4px 4px 0; background:var(--c, var(--s1)); min-width:0; }
+.bar-val{ font-family:var(--mono); font-size:12px; color:var(--ink-2); font-variant-numeric:tabular-nums; }
+.bar-val .inf{ color:var(--warn-text); font-weight:700; }
+.pair-tracks{ display:grid; gap:2px; }
+.pair-tracks .bar-track{ height:8px; }
+.bar-val.two{ display:grid; line-height:1.25; }
+.bar-val.two i{ font-style:normal; color:var(--muted); }
+
+.legend{ display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:9px; }
+.key{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-2); }
+.key i{ width:9px; height:9px; border-radius:50%; background:var(--c); flex:0 0 auto; }
+
+.badge-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+
+/* chart */
+.chart-card{
+  position:relative; border:1px solid var(--line); border-radius:var(--radius);
+  padding:10px 10px 8px; background:var(--surface);
+}
+.chart-card svg{ display:block; width:100%; }
+.chart-tip{
+  position:absolute; z-index:6; pointer-events:none; min-width:120px;
+  background:var(--surface); border:1px solid var(--line-2); border-radius:8px;
+  box-shadow:var(--shadow-pop); padding:7px 10px; font-size:12px; display:none;
+}
+.chart-tip .tip-t{ font-weight:700; font-family:var(--mono); margin-bottom:3px; }
+.chart-tip .tip-r{ display:flex; align-items:center; gap:6px; }
+.chart-tip .tip-r i{ width:8px; height:8px; border-radius:50%; background:var(--c); flex:0 0 auto; }
+.chart-tip .tip-r b{ font-family:var(--mono); font-weight:600; margin-left:auto; padding-left:10px; }
+.gridline{ stroke:var(--grid-line); stroke-width:1; }
+.axisline{ stroke:var(--axis); stroke-width:1; }
+.tick-label{ font-size:10.5px; fill:var(--muted); font-family:var(--mono); }
+.serie{ fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.crosshair{ stroke:var(--line-2); stroke-width:1; }
+.hover-dot{ stroke:var(--surface); stroke-width:2; }
+
+/* stats */
+.sim-stats{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
+.stat{ border:1px solid var(--line); border-radius:var(--radius); padding:9px 12px; background:var(--surface-2); }
+.stat-label{ display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+.stat-value{ display:block; font-size:21px; font-weight:700; margin-top:1px; }
+.sim-controls{ display:flex; gap:7px; flex-wrap:wrap; }
+.sim-controls .btn{ flex:1 1 auto; }
+.speed-row{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.speed-row input{ width:112px; font-family:var(--mono); }
+.chip.on{ background:var(--accent-soft); border-color:var(--accent-ring); color:var(--accent-text); }
+.sim-path{
+  display:flex; align-items:center; gap:4px; overflow-x:auto; padding:7px 2px 9px;
+  font-family:var(--mono); font-size:12.5px; white-space:nowrap; scrollbar-width:thin;
+}
+.crumb{
+  padding:2px 8px; border:1px solid var(--line); border-radius:6px; background:var(--surface-2);
+  color:var(--ink-2); flex:0 0 auto;
+}
+.crumb.current{ background:var(--accent-soft); border-color:var(--accent-ring); color:var(--accent-text); font-weight:700; }
+.sim-path .arr{ color:var(--muted); flex:0 0 auto; }
+.mc-value{ font-size:24px; font-weight:700; font-family:var(--mono); letter-spacing:-.01em; }
+.mc-grid{ display:grid; gap:3px; margin-top:6px; font-size:12.5px; color:var(--ink-2); }
+.mc-grid b{ font-family:var(--mono); font-weight:600; }
+
+/* matrix */
+.matrix-scroll{ overflow:auto; max-height:330px; border:1px solid var(--line); border-radius:var(--radius); }
+.matrix-table{ border-collapse:separate; border-spacing:0; font-size:12.5px; min-width:100%; }
+.matrix-table th, .matrix-table td{ padding:3px; border-bottom:1px solid var(--line); text-align:center; }
+.matrix-table thead th{
+  position:sticky; top:0; z-index:3; background:var(--surface-2); font-weight:700;
+  padding:7px 6px; font-size:12px; min-width:56px;
+}
+.matrix-table tbody th{
+  position:sticky; left:0; z-index:2; background:var(--surface-2); font-weight:700;
+  padding:4px 9px; text-align:right; max-width:110px; overflow:hidden; text-overflow:ellipsis;
+}
+.matrix-table thead th:first-child{ left:0; z-index:4; }
+.matrix-table input.cell{
+  width:56px; min-height:32px; padding:3px 5px; text-align:right; font-family:var(--mono); font-size:12.5px;
+  border:1px solid transparent; border-radius:6px; background:transparent;
+}
+.matrix-table input.cell:hover{ border-color:var(--line-2); }
+.matrix-table input.cell:focus{ border-color:var(--accent); background:var(--surface); outline:none; }
+.matrix-table input.cell.zero{ color:var(--muted); opacity:.55; }
+.matrix-table input.cell.diag{ background:var(--accent-soft); }
+.sum-cell{ font-family:var(--mono); font-weight:700; padding:0 9px !important; white-space:nowrap; }
+.sum-cell.ok{ color:var(--ok-text); } .sum-cell.warn{ color:var(--warn-text); } .sum-cell.bad{ color:var(--bad-text); }
+
+.class-row{
+  border:1px solid var(--line); border-radius:var(--radius); padding:9px 11px; margin-bottom:8px;
+  display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+}
+.class-states{ display:flex; flex-wrap:wrap; gap:4px; margin-right:auto; }
+.class-states .st{
+  font-family:var(--mono); font-size:12px; font-weight:700; padding:1px 8px;
+  background:var(--surface-2); border:1px solid var(--line); border-radius:6px;
+}
+
+/* modal */
+.modal-scrim{
+  position:fixed; inset:0; background:var(--scrim); z-index:50;
+  display:grid; place-items:center; padding:20px;
+}
+.modal-scrim[hidden]{ display:none; }
+.modal{
+  width:min(600px, 100%); max-height:min(80dvh, 640px); overflow-y:auto;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-pop); padding:20px;
+}
+.modal-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+.modal h2{ font-size:16px; }
+.modal h3{ font-size:13px; margin:16px 0 8px; }
+.kbd-grid{ display:grid; grid-template-columns:auto 1fr; gap:7px 14px; align-items:center; font-size:13px; color:var(--ink-2); }
+.kbd{
+  font-family:var(--mono); font-size:11.5px; font-weight:700; padding:2px 7px;
+  border:1px solid var(--line-2); border-bottom-width:2px; border-radius:6px;
+  background:var(--surface-2); white-space:nowrap; justify-self:start;
+}
+.modal p{ font-size:13px; color:var(--ink-2); margin:6px 0; }
+
+/* toasts */
+.toasts{
+  position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:60;
+  display:grid; gap:8px; justify-items:center; pointer-events:none; width:min(480px, calc(100vw - 24px));
+}
+.toast{
+  display:flex; align-items:center; gap:8px; padding:9px 15px; border-radius:999px;
+  background:var(--ink); color:var(--bg); font-size:13px; font-weight:600;
+  box-shadow:var(--shadow-pop); animation:toast-in .22s ease; max-width:100%;
+}
+.toast .icon{ width:15px; height:15px; }
+.toast.ok .icon{ color:#58c87e; }
+.toast.warn .icon{ color:#e2b25c; }
+@keyframes toast-in{ from{ opacity:0; transform:translateY(8px); } }
+
+.empty{ padding:14px; text-align:center; color:var(--muted); font-size:13px; border:1px dashed var(--line-2); border-radius:var(--radius); }
+
+/* ============================== responsive ============================== */
+@media (max-width:1150px){
+  .app{ height:auto; min-height:100dvh; grid-template-rows:auto auto; }
+  .shell{ grid-template-columns:minmax(0,1fr); height:auto; }
+  .graph-wrap{ height:56vh; min-height:380px; flex:none; }
+  .side-body{ overflow:visible; }
+}
+@media (max-width:640px){
+  body{ font-size:15px; }
+  .topbar{ height:auto; padding:10px 12px; flex-wrap:wrap; }
+  .brand-sub{ display:none; }
+  .shell{ padding:10px; gap:10px; }
+  .graph-wrap{ height:50vh; min-height:320px; }
+  .side-head{ flex-wrap:wrap; padding:8px 10px 0; gap:4px; }
+  .side-head .pill{ order:-1; margin-left:auto; }
+  .tabs{ flex:1 1 100%; overflow-x:auto; scrollbar-width:none; }
+  .tab-btn{ flex:1 0 auto; padding:8px 10px; font-size:13px; }
+  .field-row, .sim-stats{ grid-template-columns:1fr; }
+  .bar-row{ grid-template-columns:64px minmax(0,1fr) 58px; }
+  select, input[type="number"], input[type="text"]{ font-size:16px; }
+}
+@media (prefers-reduced-motion:reduce){
+  *, *::before, *::after{ transition:none !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="10" r="3"></circle><circle cx="9" cy="18" r="3"></circle><path d="M8.8 7.4 15.2 9M16.3 12.5l-5.2 3.6"></path></svg></span>
+      <div>
+        <h1>Markov Chain Studio</h1>
+        <span class="brand-sub">exact solver · distributions · simulation</span>
+      </div>
+    </div>
+    <div class="top-actions">
+      <label class="visually-hidden" for="preset-select">Load an example</label>
+      <select id="preset-select" class="preset-select">
+        <option value="" selected>Examples…</option>
+        <option value="simple">Absorbing chain (A–D)</option>
+        <option value="weather">Weather (ergodic chain)</option>
+        <option value="gambler">Gambler's ruin</option>
+        <option value="coin">Waiting for HH (coin)</option>
+        <option value="cycle">Periodic cycle (d = 4)</option>
+      </select>
+      <span class="divider" aria-hidden="true"></span>
+      <button class="icon-btn" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg class="icon" viewBox="0 0 24 24"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-15-6.7L3 13"></path></svg></button>
+      <button class="icon-btn" id="btn-redo" title="Redo (Ctrl+Y)" aria-label="Redo"><svg class="icon" viewBox="0 0 24 24"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 15-6.7L21 13"></path></svg></button>
+      <span class="divider" aria-hidden="true"></span>
+      <button class="icon-btn" id="btn-import" title="Import JSON" aria-label="Import JSON"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3"></path><path d="M7 8l5-5 5 5"></path><path d="M5 21h14"></path></svg></button>
+      <button class="icon-btn" id="btn-export" title="Export JSON" aria-label="Export JSON"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg></button>
+      <span class="divider" aria-hidden="true"></span>
+      <button class="icon-btn" id="btn-theme" title="Toggle theme" aria-label="Toggle light/dark theme"></button>
+      <button class="icon-btn" id="btn-help" title="Help & shortcuts (?)" aria-label="Help"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2-3 4"></path><path d="M12 17h.01"></path></svg></button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="panel canvas-panel" aria-label="Graph editor">
+      <div class="canvas-toolbar">
+        <div class="tool-group">
+          <button class="btn primary" id="btn-add-node"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>State</button>
+          <button class="btn" id="btn-connect" aria-pressed="false" title="Connect mode: click the source, then the target (E)"><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg>Connect</button>
+          <button class="btn" id="btn-layout" title="Rearrange states into a regular polygon"><svg class="icon" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"></rect><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"></rect><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"></rect><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"></rect></svg>Arrange</button>
+        </div>
+        <div class="tool-group">
+          <button class="icon-btn" id="btn-zoom-out" title="Zoom out" aria-label="Zoom out"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path><path d="M8 11h6"></path></svg></button>
+          <button class="icon-btn" id="btn-zoom-in" title="Zoom in" aria-label="Zoom in"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path><path d="M11 8v6"></path><path d="M8 11h6"></path></svg></button>
+          <button class="icon-btn" id="btn-fit" title="Fit view (F)" aria-label="Fit view"><svg class="icon" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path></svg></button>
+          <span class="divider" aria-hidden="true"></span>
+          <button class="btn ghost danger" id="btn-clear"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>Clear</button>
+        </div>
+      </div>
+      <div class="graph-wrap" id="graph-wrap">
+        <svg id="graph" viewBox="0 0 1200 660" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Interactive Markov chain graph">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--edge)"></path></marker>
+            <marker id="arrow-sel" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--accent)"></path></marker>
+          </defs>
+          <g id="world">
+            <g id="edge-layer"></g>
+            <g id="node-layer"></g>
+            <g id="fx-layer"></g>
+            <g id="token-layer"></g>
+          </g>
+        </svg>
+        <div class="sim-hud" id="sim-hud" hidden></div>
+        <div class="inline-editor" id="inline-editor" hidden>
+          <input id="inline-editor-input" type="number" min="0" max="1" step="0.05" aria-label="Edge probability">
+        </div>
+        <div class="zoom-note" id="zoom-note">100%</div>
+      </div>
+      <div class="inspector" id="inspector" aria-live="polite"></div>
+    </section>
+
+    <aside class="panel side-panel" aria-label="Analysis & controls">
+      <div class="side-head">
+        <nav class="tabs" role="tablist" aria-label="Sections">
+          <button class="tab-btn" role="tab" id="tabbtn-solve" data-tab="solve" aria-selected="true" aria-controls="tab-solve">Solve</button>
+          <button class="tab-btn" role="tab" id="tabbtn-dist" data-tab="dist" aria-selected="false" aria-controls="tab-dist">Distributions</button>
+          <button class="tab-btn" role="tab" id="tabbtn-sim" data-tab="sim" aria-selected="false" aria-controls="tab-sim">Simulation</button>
+          <button class="tab-btn" role="tab" id="tabbtn-matrix" data-tab="matrix" aria-selected="false" aria-controls="tab-matrix">Matrix</button>
+        </nav>
+        <span class="pill" id="status-pill">…</span>
+      </div>
+      <div class="side-body">
+
+        <section class="tab-panel active" id="tab-solve" role="tabpanel" aria-labelledby="tabbtn-solve">
+          <div class="seg" id="mode-seg" role="group" aria-label="Computation type">
+            <button class="seg-btn active" data-mode="hit">P(X before Y)</button>
+            <button class="seg-btn" data-mode="expected">E[steps to X]</button>
+          </div>
+          <p class="hint" id="mode-hint" style="margin-bottom:14px"></p>
+          <div class="field">
+            <label class="label" for="start-select">Start state</label>
+            <select id="start-select"></select>
+          </div>
+          <div class="field">
+            <span class="label" id="xset-label">Target X — to reach</span>
+            <div class="chip-row" id="xset-chips" role="group" aria-labelledby="xset-label"></div>
+          </div>
+          <div class="field" id="yset-field">
+            <span class="label" id="yset-label">Y — to avoid</span>
+            <div class="chip-row" id="yset-chips" role="group" aria-labelledby="yset-label"></div>
+          </div>
+          <label class="switch-row"><input type="checkbox" id="autoloop" checked><span class="switch" aria-hidden="true"></span><span>Fill each state's missing outgoing mass as a self-loop</span></label>
+          <label class="switch-row"><input type="checkbox" id="heat-toggle" checked><span class="switch" aria-hidden="true"></span><span>Color states by the computed value</span></label>
+          <div class="result-card" id="result-card" aria-live="polite"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-dist" role="tabpanel" aria-labelledby="tabbtn-dist">
+          <h3 class="block-title">Stationary distribution π</h3>
+          <div id="stationary-box"></div>
+          <h3 class="block-title">Distribution over time πₙ</h3>
+          <div class="field-row" style="margin-bottom:12px">
+            <div class="field" style="margin-bottom:0">
+              <label class="label" for="evo-dist0">Initial distribution</label>
+              <select id="evo-dist0">
+                <option value="start">Point mass at start</option>
+                <option value="uniform">Uniform</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label class="label" for="evo-steps">Horizon: <output id="evo-steps-out">30</output> steps</label>
+              <input type="range" id="evo-steps" min="5" max="200" step="5" value="30">
+            </div>
+          </div>
+          <div id="evo-box"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-sim" role="tabpanel" aria-labelledby="tabbtn-sim">
+          <div class="sim-controls">
+            <button class="btn primary" id="sim-play"></button>
+            <button class="btn" id="sim-step"><svg class="icon filled" viewBox="0 0 24 24"><path d="M5 4v16l10-8z"></path><rect x="17.5" y="4" width="2.5" height="16" rx="1"></rect></svg>Step</button>
+            <button class="btn ghost" id="sim-reset"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path></svg>Reset</button>
+          </div>
+          <div class="field" style="margin:12px 0 4px">
+            <label class="label" for="sim-speed">Speed (0.25× – 10,000×)</label>
+            <div class="speed-row">
+              <input type="number" id="sim-speed" min="0.25" max="10000" step="any" value="1" inputmode="decimal" title="Type any speed from 0.25 to 10,000. Above 5×, steps run in batches without animation.">
+              <div class="chip-row" id="speed-presets" role="group" aria-label="Speed presets">
+                <button type="button" class="chip mini" data-speed="1">1×</button>
+                <button type="button" class="chip mini" data-speed="10">10×</button>
+                <button type="button" class="chip mini" data-speed="100">100×</button>
+                <button type="button" class="chip mini" data-speed="1000">1000×</button>
+                <button type="button" class="chip mini" data-speed="10000">10000×</button>
+              </div>
+            </div>
+          </div>
+          <label class="switch-row"><input type="checkbox" id="sim-stop-target" checked><span class="switch" aria-hidden="true"></span><span>Auto-stop when a state in X or Y is reached</span></label>
+          <div id="sim-guard"></div>
+          <div class="sim-stats">
+            <div class="stat"><span class="stat-label">Steps</span><span class="stat-value" id="sim-steps-count">0</span></div>
+            <div class="stat"><span class="stat-label">Current state</span><span class="stat-value" id="sim-state-chip">—</span></div>
+          </div>
+          <div class="field">
+            <span class="label">Path</span>
+            <div class="sim-path" id="sim-path"></div>
+          </div>
+          <h3 class="block-title">Visit frequencies</h3>
+          <div id="sim-freq"></div>
+          <h3 class="block-title">Monte Carlo estimate</h3>
+          <p class="hint" id="mc-hint" style="margin-bottom:9px"></p>
+          <div class="field-row" style="margin-bottom:10px">
+            <div class="field" style="margin-bottom:0">
+              <label class="label" for="mc-trials">Number of runs</label>
+              <select id="mc-trials">
+                <option value="1000">1,000</option>
+                <option value="10000" selected>10,000</option>
+                <option value="100000">100,000</option>
+              </select>
+            </div>
+            <button class="btn primary" id="mc-run" style="min-height:38px">Run</button>
+          </div>
+          <div id="mc-result"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-matrix" role="tabpanel" aria-labelledby="tabbtn-matrix">
+          <div class="block-head">
+            <h3>Transition matrix P</h3>
+            <div class="tool-group">
+              <button class="btn small" id="btn-copy-csv"><svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>CSV</button>
+              <button class="btn small" id="btn-copy-latex"><svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>LaTeX</button>
+            </div>
+          </div>
+          <div id="matrix-box"></div>
+          <p class="hint" style="margin-top:8px">Type 0 to delete an edge. The Σ column shows each row's sum; with auto self-loop on, the remainder up to 1 is added on the diagonal.</p>
+          <h3 class="block-title">State classification</h3>
+          <div id="class-list"></div>
+        </section>
+
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="modal-scrim" id="help-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="modal-head">
+      <h2 id="help-title">Quick guide</h2>
+      <button class="icon-btn" id="btn-help-close" aria-label="Close"><svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg></button>
+    </div>
+    <p><b>Editing:</b> double-click the canvas to add a state; drag a state to move it; <b>Shift + drag</b> from one state to another creates an edge (to itself = a self-loop). The “Connect” button does the same with clicks only. Click an edge, or double-click its label, to edit its probability.</p>
+    <p><b>Navigation:</b> scroll to zoom; drag the background to pan.</p>
+    <p><b>Solving:</b> pick the start state and the X/Y sets — the result is recomputed instantly and exactly (linear system, Gaussian elimination with a residual check).</p>
+    <h3>Keyboard shortcuts</h3>
+    <div class="kbd-grid">
+      <span class="kbd">N</span><span>Add a new state</span>
+      <span class="kbd">E</span><span>Toggle connect mode</span>
+      <span class="kbd">S / X / Y</span><span>Set the selected state as start / toggle X / toggle Y</span>
+      <span class="kbd">Del</span><span>Delete the selection (state or edge)</span>
+      <span class="kbd">F</span><span>Fit the graph in view</span>
+      <span class="kbd">Ctrl+Z / Ctrl+Y</span><span>Undo / Redo</span>
+      <span class="kbd">P</span><span>Play / pause the simulation</span>
+      <span class="kbd">?</span><span>Open this guide</span>
+      <span class="kbd">Esc</span><span>Close / cancel the current action</span>
+    </div>
+    <h3>Computation modes</h3>
+    <p><b>P(X before Y)</b> — the probability that the chain, starting from the start state, reaches set X before set Y.</p>
+    <p><b>E[steps to X]</b> — the expected number of transitions until X is first reached. If a closed class without X is reachable, the time is infinite and reported as such.</p>
+    <p><b>Distributions</b> — stationary π (unique for irreducible chains), communicating-class classification, period, plus the step-by-step evolution of πₙ.</p>
+    <p><b>Simulation</b> — an animated random walk through the chain, empirical visit frequencies compared against π, and a Monte Carlo estimator that cross-checks the exact result.</p>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<input type="file" id="file-input" accept="application/json,.json" hidden>
+
+<script>
+"use strict";
+/* ============================================================
+   Markov Chain Studio — a single file, zero dependencies.
+   Part 1: model, math, presets, undo/redo, persistence
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const EPS = 1e-9;
+const SUM_TOL = 1e-7;
+const RESIDUAL_TOLERANCE = 1e-8;
+const NODE_R = 30;
+const STORAGE_KEY = "markov-studio-v1";
+const SERIES = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)","var(--s5)","var(--s6)","var(--s7)","var(--s8)"];
+
+const state = {
+  model: null,
+  ui: {
+    tab: "solve",
+    selection: null,          // {type:'node'|'edge', id|key}
+    connectMode: false,
+    connectFrom: null,
+    heat: true,
+    evoSteps: 30,
+    evoDist: "start",
+    statClass: 0,
+    view: { x: 0, y: 0, k: 1 }
+  },
+  analysis: null
+};
+
+/* ---------- utilities ---------- */
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+function gcd(a, b){ a = Math.abs(a); b = Math.abs(b); while(b){ [a, b] = [b, a % b]; } return a; }
+function escapeHtml(v){
+  return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+}
+function fmt(v){
+  if(v === Infinity) return "∞";
+  if(!Number.isFinite(v)) return "n/a";
+  if(Math.abs(v) < 1e-10) return "0";
+  if(Math.abs(v - 1) < 1e-10) return "1";
+  if(Math.abs(v) >= 1000) return v.toFixed(1);
+  if(Math.abs(v) >= 100) return v.toFixed(2);
+  if(Math.abs(v) >= 10) return v.toFixed(3);
+  return v.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+function fmtPct(v){
+  if(!Number.isFinite(v)) return "n/a";
+  const p = 100 * clamp(v, 0, 1);
+  const s = p >= 99.995 || p === 0 ? p.toFixed(0) : p >= 10 ? p.toFixed(1) : p.toFixed(2);
+  return s.replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1") + "%";
+}
+function fmtExp(v){
+  if(v === Infinity) return "∞";
+  if(!Number.isFinite(v)) return "n/a";
+  return fmt(v);
+}
+function displayLabel(node){
+  if(!node) return "";
+  const raw = (node.label ?? "").trim();
+  return raw || node.id;
+}
+function nodeById(id){ return state.model.nodes.find(n => n.id === id); }
+function labelFor(id){ return displayLabel(nodeById(id)); }
+function nodeIndex(id){ return state.model.nodes.findIndex(n => n.id === id); }
+
+/* ---------- model ---------- */
+function blankModel(){
+  return { nodes: [], edges: [], start: null, xSet: new Set(), ySet: new Set(),
+           mode: "hit", autoLoop: true, nextId: 1 };
+}
+function serializeModel(m){
+  return {
+    nodes: m.nodes.map(n => ({ id: n.id, label: n.label, x: Math.round(n.x), y: Math.round(n.y), pinned: !!n.pinned })),
+    edges: m.edges.map(e => ({ from: e.from, to: e.to, p: e.p })),
+    start: m.start, xSet: [...m.xSet], ySet: [...m.ySet],
+    mode: m.mode, autoLoop: m.autoLoop, nextId: m.nextId
+  };
+}
+function hydrateModel(d){
+  if(!d || !Array.isArray(d.nodes) || !Array.isArray(d.edges)) throw new Error("Invalid JSON structure.");
+  const m = blankModel();
+  const ids = new Set();
+  for(const n of d.nodes){
+    if(typeof n.id !== "string" || ids.has(n.id)) throw new Error("States with missing or duplicate ids.");
+    if(!Number.isFinite(+n.x) || !Number.isFinite(+n.y)) throw new Error("Invalid coordinates.");
+    ids.add(n.id);
+    m.nodes.push({ id: n.id, label: String(n.label ?? n.id).slice(0, 24), x: +n.x, y: +n.y, pinned: !!n.pinned });
+  }
+  const seen = new Set();
+  for(const e of d.edges){
+    const p = +e.p;
+    if(!ids.has(e.from) || !ids.has(e.to)) throw new Error("Edge pointing to a missing state.");
+    if(!Number.isFinite(p) || p < 0 || p > 1) throw new Error("Probability outside [0, 1].");
+    const key = e.from + "|" + e.to;
+    if(seen.has(key)) continue;
+    seen.add(key);
+    if(p > 0) m.edges.push({ from: e.from, to: e.to, p });
+  }
+  m.start = ids.has(d.start) ? d.start : (m.nodes[0]?.id ?? null);
+  m.xSet = new Set((Array.isArray(d.xSet) ? d.xSet : []).filter(id => ids.has(id)));
+  m.ySet = new Set((Array.isArray(d.ySet) ? d.ySet : []).filter(id => ids.has(id) && !m.xSet.has(id)));
+  m.mode = d.mode === "expected" ? "expected" : "hit";
+  m.autoLoop = d.autoLoop !== false;
+  let maxNum = 0;
+  for(const id of ids){ const mt = /^n(\d+)$/.exec(id); if(mt) maxNum = Math.max(maxNum, +mt[1]); }
+  m.nextId = Math.max(Number.isInteger(d.nextId) ? d.nextId : 1, maxNum + 1);
+  return m;
+}
+function sanitizeModel(m){
+  const ids = new Set(m.nodes.map(n => n.id));
+  m.edges = m.edges.filter(e => ids.has(e.from) && ids.has(e.to) && e.p > 0);
+  for(const id of [...m.xSet]) if(!ids.has(id)) m.xSet.delete(id);
+  for(const id of [...m.ySet]) if(!ids.has(id) || m.xSet.has(id)) m.ySet.delete(id);
+  if(!ids.has(m.start)) m.start = m.nodes[0]?.id ?? null;
+  const sel = state.ui.selection;
+  if(sel){
+    if(sel.type === "node" && !ids.has(sel.id)) state.ui.selection = null;
+    if(sel.type === "edge" && !m.edges.some(e => e.from + "|" + e.to === sel.key)) state.ui.selection = null;
+  }
+  if(state.ui.connectFrom && !ids.has(state.ui.connectFrom)) state.ui.connectFrom = null;
+}
+function uid(){ const id = "n" + state.model.nextId; state.model.nextId += 1; return id; }
+
+/* ---------- history (undo/redo) ---------- */
+const history = [], future = [];
+const MAX_HISTORY = 80;
+function recordSnapshot(){
+  history.push(JSON.stringify(serializeModel(state.model)));
+  if(history.length > MAX_HISTORY) history.shift();
+  future.length = 0;
+}
+function apply(fn){ recordSnapshot(); fn(); afterModelChange(); }
+function afterModelChange(){
+  sanitizeModel(state.model);
+  resetSim(false);
+  saveLocal();
+  render();
+}
+let layoutAnim = null;
+function cancelLayoutAnim(){
+  if(layoutAnim){
+    cancelAnimationFrame(layoutAnim.raf);
+    clearTimeout(layoutAnim.watchdog);
+    layoutAnim = null;
+  }
+}
+function undo(){
+  if(!history.length) return;
+  future.push(JSON.stringify(serializeModel(state.model)));
+  state.model = hydrateModel(JSON.parse(history.pop()));
+  sanitizeModel(state.model); resetSim(false); saveLocal(); render();
+}
+function redo(){
+  if(!future.length) return;
+  history.push(JSON.stringify(serializeModel(state.model)));
+  state.model = hydrateModel(JSON.parse(future.pop()));
+  sanitizeModel(state.model); resetSim(false); saveLocal(); render();
+}
+
+/* ---------- persistence ---------- */
+function saveLocal(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      model: serializeModel(state.model),
+      ui: {
+        theme: document.documentElement.dataset.theme,
+        tab: state.ui.tab, heat: state.ui.heat,
+        evoSteps: state.ui.evoSteps, evoDist: state.ui.evoDist,
+        simSpeed: sim.speed
+      }
+    }));
+  }catch(err){ /* storage unavailable — the app keeps working */ }
+}
+function loadLocal(){
+  try{
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if(!d) return null;
+    const model = hydrateModel(d.model);
+    return { model, ui: d.ui || {} };
+  }catch(err){ return null; }
+}
+
+/* ---------- building the matrix ---------- */
+function buildMatrix(m){
+  const n = m.nodes.length;
+  const index = new Map(m.nodes.map((node, i) => [node.id, i]));
+  const P = Array.from({ length: n }, () => new Array(n).fill(0));
+  const errors = [];
+  for(const e of m.edges){
+    const i = index.get(e.from), j = index.get(e.to);
+    if(i === undefined || j === undefined) continue;
+    if(!Number.isFinite(e.p) || e.p < -EPS || e.p > 1 + EPS){
+      errors.push(`Invalid probability on ${labelFor(e.from)} → ${labelFor(e.to)}.`);
+      continue;
+    }
+    P[i][j] += Math.max(0, e.p);
+  }
+  const sums = new Array(n).fill(0);
+  for(let i = 0; i < n; i++){
+    const sum = P[i].reduce((a, b) => a + b, 0);
+    sums[i] = sum;
+    if(sum > 1 + SUM_TOL){
+      errors.push(`Outgoing sum from ${displayLabel(m.nodes[i])} is ${fmt(sum)} — above 1.`);
+    }else if(m.autoLoop && sum < 1 - SUM_TOL){
+      P[i][i] += 1 - sum;
+    }else if(!m.autoLoop && Math.abs(sum - 1) > SUM_TOL){
+      errors.push(`Outgoing sum from ${displayLabel(m.nodes[i])} is ${fmt(sum)}, not 1. Enable auto self-loop or complete the transitions.`);
+    }
+  }
+  return { P, errors, sums };
+}
+
+/* ---------- linear algebra ---------- */
+function gaussianSolve(A, b){
+  const n = b.length;
+  if(n === 0) return [];
+  const M = A.map((row, i) => [...row, b[i]]);
+  for(let col = 0; col < n; col++){
+    let piv = col;
+    for(let r = col + 1; r < n; r++) if(Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+    if(Math.abs(M[piv][col]) < 1e-12) throw new Error("The linear system is singular for this configuration.");
+    if(piv !== col) [M[piv], M[col]] = [M[col], M[piv]];
+    const d = M[col][col];
+    for(let c = col; c <= n; c++) M[col][c] /= d;
+    for(let r = 0; r < n; r++){
+      if(r === col) continue;
+      const f = M[r][col];
+      if(Math.abs(f) < EPS) continue;
+      for(let c = col; c <= n; c++) M[r][c] -= f * M[col][c];
+    }
+  }
+  return M.map(row => row[n]);
+}
+function linearResidual(A, x, b){
+  let max = 0;
+  for(let i = 0; i < b.length; i++){
+    let s = -b[i];
+    for(let j = 0; j < x.length; j++) s += A[i][j] * x[j];
+    max = Math.max(max, Math.abs(s));
+  }
+  return max;
+}
+function assertSmallResidual(res){
+  if(res > RESIDUAL_TOLERANCE) throw new Error(`Numeric residual too large (${res.toExponential(2)}). Check the transitions.`);
+}
+
+/* ---------- graphs: reachability & SCCs ---------- */
+function canReachSet(P, targets){
+  const n = P.length;
+  const seen = new Array(n).fill(false);
+  const rev = Array.from({ length: n }, () => []);
+  for(let i = 0; i < n; i++) for(let j = 0; j < n; j++) if(P[i][j] > EPS) rev[j].push(i);
+  const stack = [...targets];
+  for(const t of stack) seen[t] = true;
+  while(stack.length){
+    const v = stack.pop();
+    for(const u of rev[v]) if(!seen[u]){ seen[u] = true; stack.push(u); }
+  }
+  return seen;
+}
+function tarjanSCC(P){
+  const n = P.length;
+  const index = new Array(n).fill(-1), low = new Array(n).fill(0), onStack = new Array(n).fill(false);
+  const stack = [], comps = [];
+  let tick = 0;
+  for(let s = 0; s < n; s++){
+    if(index[s] !== -1) continue;
+    index[s] = low[s] = tick++; stack.push(s); onStack[s] = true;
+    const work = [{ v: s, w: 0 }];
+    while(work.length){
+      const f = work[work.length - 1];
+      let descended = false;
+      while(f.w < n){
+        const w = f.w++;
+        if(P[f.v][w] <= EPS) continue;
+        if(index[w] === -1){
+          index[w] = low[w] = tick++; stack.push(w); onStack[w] = true;
+          work.push({ v: w, w: 0 }); descended = true; break;
+        }else if(onStack[w]){
+          low[f.v] = Math.min(low[f.v], index[w]);
+        }
+      }
+      if(descended) continue;
+      if(low[f.v] === index[f.v]){
+        const comp = []; let x;
+        do{ x = stack.pop(); onStack[x] = false; comp.push(x); }while(x !== f.v);
+        comps.push(comp);
+      }
+      work.pop();
+      if(work.length) low[work[work.length - 1].v] = Math.min(low[work[work.length - 1].v], low[f.v]);
+    }
+  }
+  return comps;
+}
+function classPeriod(P, comp){
+  if(comp.length === 1) return P[comp[0]][comp[0]] > EPS ? 1 : 0;
+  const set = new Set(comp);
+  const level = new Map([[comp[0], 0]]);
+  const q = [comp[0]];
+  while(q.length){
+    const u = q.shift();
+    for(let v = 0; v < P.length; v++){
+      if(P[u][v] > EPS && set.has(v) && !level.has(v)){ level.set(v, level.get(u) + 1); q.push(v); }
+    }
+  }
+  let g = 0;
+  for(const u of comp) for(let v = 0; v < P.length; v++){
+    if(P[u][v] > EPS && set.has(v)) g = gcd(g, level.get(u) + 1 - level.get(v));
+  }
+  return g || 1;
+}
+function classify(P){
+  const n = P.length;
+  const comps = tarjanSCC(P);
+  const compOf = new Array(n);
+  comps.forEach((c, ci) => c.forEach(i => { compOf[i] = ci; }));
+  const closed = comps.map((c, ci) => c.every(i => P[i].every((p, j) => p <= EPS || compOf[j] === ci)));
+  const period = comps.map(c => classPeriod(P, c));
+  const irreducible = comps.length === 1;
+  return {
+    comps, compOf, closed, period, irreducible,
+    aperiodic: irreducible && period[0] === 1,
+    recurrent: (i) => closed[compOf[i]],
+    absorbing: (i) => P[i][i] >= 1 - SUM_TOL
+  };
+}
+
+/* ---------- exact solvers ---------- */
+function solveHitPure(P, startIdx, xIdx, yIdx){
+  const n = P.length;
+  if(startIdx == null || startIdx < 0 || n === 0) throw new Error("Add at least one state and choose a start.");
+  if(!xIdx.size) throw new Error("Pick at least one state for target X.");
+  if(!yIdx.size) throw new Error("This mode needs at least one state in Y (to avoid). Pick one, or switch to E[steps].");
+  for(const i of xIdx) if(yIdx.has(i)) throw new Error("Sets X and Y must be disjoint.");
+  const canX = canReachSet(P, [...xIdx]);
+  const fixed = new Map();
+  for(const i of xIdx) fixed.set(i, 1);
+  for(const i of yIdx) fixed.set(i, 0);
+  for(let i = 0; i < n; i++) if(!fixed.has(i) && !canX[i]) fixed.set(i, 0);
+  const unknown = [], pos = new Map();
+  for(let i = 0; i < n; i++) if(!fixed.has(i)){ pos.set(i, unknown.length); unknown.push(i); }
+  const A = Array.from({ length: unknown.length }, () => new Array(unknown.length).fill(0));
+  const b = new Array(unknown.length).fill(0);
+  unknown.forEach((i, row) => {
+    A[row][row] += 1;
+    for(let j = 0; j < n; j++){
+      const p = P[i][j];
+      if(p <= EPS) continue;
+      if(pos.has(j)) A[row][pos.get(j)] -= p;
+      else b[row] += p * fixed.get(j);
+    }
+  });
+  const sol = gaussianSolve(A, b);
+  const residual = linearResidual(A, sol, b);
+  assertSmallResidual(residual);
+  const values = new Array(n).fill(0);
+  for(const [i, v] of fixed) values[i] = v;
+  unknown.forEach((i, k) => { values[i] = clamp(sol[k], 0, 1); });
+  return { kind: "hit", values, startValue: values[startIdx], residual };
+}
+function solveExpectedPure(P, startIdx, xIdx){
+  const n = P.length;
+  if(startIdx == null || startIdx < 0 || n === 0) throw new Error("Add at least one state and choose a start.");
+  if(!xIdx.size) throw new Error("Pick at least one state for target X.");
+  const canT = canReachSet(P, [...xIdx]);
+  const rest = [];
+  for(let i = 0; i < n; i++) if(!xIdx.has(i)) rest.push(i);
+  const Q = rest.map(i => rest.map(j => P[i][j]));
+  const comps = tarjanSCC(Q).map(c => c.map(k => rest[k]));
+  const bad = new Set();
+  for(const comp of comps){
+    const cs = new Set(comp);
+    let closed = true;
+    outer: for(const i of comp){
+      for(let j = 0; j < n; j++) if(P[i][j] > EPS && !cs.has(j)){ closed = false; break outer; }
+    }
+    if(closed) for(const i of comp) bad.add(i);
+  }
+  const reachesBad = canReachSet(P, [...bad]);
+  const infinite = new Array(n).fill(false);
+  for(let i = 0; i < n; i++) if(!xIdx.has(i) && (!canT[i] || reachesBad[i])) infinite[i] = true;
+  const unknown = [], pos = new Map();
+  for(let i = 0; i < n; i++) if(!xIdx.has(i) && !infinite[i]){ pos.set(i, unknown.length); unknown.push(i); }
+  const A = Array.from({ length: unknown.length }, () => new Array(unknown.length).fill(0));
+  const b = new Array(unknown.length).fill(1);
+  unknown.forEach((i, row) => {
+    A[row][row] += 1;
+    for(let j = 0; j < n; j++){
+      const p = P[i][j];
+      if(p <= EPS || xIdx.has(j)) continue;
+      if(pos.has(j)) A[row][pos.get(j)] -= p;
+    }
+  });
+  const sol = gaussianSolve(A, b);
+  const residual = linearResidual(A, sol, b);
+  assertSmallResidual(residual);
+  const values = new Array(n).fill(0);
+  for(let i = 0; i < n; i++) if(infinite[i]) values[i] = Infinity;
+  unknown.forEach((i, k) => { values[i] = Math.max(0, sol[k]); });
+  return { kind: "expected", values, startValue: values[startIdx], residual };
+}
+
+/* ---------- stationary distribution ---------- */
+function stationaryForClass(P, states){
+  const k = states.length;
+  if(k === 1) return [1];
+  const A = Array.from({ length: k }, () => new Array(k).fill(0));
+  const b = new Array(k).fill(0);
+  for(let c = 0; c < k; c++)
+    for(let r = 0; r < k; r++)
+      A[c][r] = P[states[r]][states[c]] - (r === c ? 1 : 0);
+  for(let r = 0; r < k; r++) A[k - 1][r] = 1;
+  b[k - 1] = 1;
+  const raw = gaussianSolve(A, b).map(v => Math.max(0, v));
+  const s = raw.reduce((a, x) => a + x, 0) || 1;
+  return raw.map(v => v / s);
+}
+function stationaryInfo(P, cls){
+  const closedIdx = cls.comps.map((c, i) => i).filter(i => cls.closed[i]);
+  const list = closedIdx.map(ci => {
+    const states = [...cls.comps[ci]].sort((a, b) => a - b);
+    let pi = null, err = null;
+    try{ pi = stationaryForClass(P, states); }catch(e){ err = e.message; }
+    return { classIndex: ci, states, pi, err };
+  });
+  let full = null;
+  if(list.length === 1 && list[0].pi){
+    full = new Array(P.length).fill(0);
+    list[0].states.forEach((s, i) => { full[s] = list[0].pi[i]; });
+  }
+  return { unique: list.length === 1, list, full };
+}
+
+/* ---------- distribution evolution ---------- */
+function evolution(P, v0, steps){
+  const out = [v0.slice()];
+  let v = v0.slice();
+  for(let t = 0; t < steps; t++){
+    const w = new Array(v.length).fill(0);
+    for(let i = 0; i < v.length; i++){
+      const vi = v[i];
+      if(vi <= 1e-15) continue;
+      const row = P[i];
+      for(let j = 0; j < row.length; j++) if(row[j] > 0) w[j] += vi * row[j];
+    }
+    v = w;
+    out.push(w);
+  }
+  return out;
+}
+function sampleRow(row){
+  let r = Math.random();
+  for(let j = 0; j < row.length; j++){
+    r -= row[j];
+    if(r <= 0) return j;
+  }
+  for(let j = row.length - 1; j >= 0; j--) if(row[j] > 0) return j;
+  return 0;
+}
+
+/* ---------- full analysis ---------- */
+function computeAnalysis(){
+  const m = state.model;
+  const a = { n: m.nodes.length, labels: m.nodes.map(displayLabel) };
+  if(a.n === 0){
+    a.P = []; a.errors = []; a.sums = [];
+    a.solveError = "Add states to the canvas (double-click) to get started.";
+    state.analysis = a;
+    return a;
+  }
+  const built = buildMatrix(m);
+  a.P = built.P; a.errors = built.errors; a.sums = built.sums;
+  if(a.errors.length){
+    a.solveError = a.errors[0];
+    state.analysis = a;
+    return a;
+  }
+  a.cls = classify(a.P);
+  a.stationary = stationaryInfo(a.P, a.cls);
+  const startIdx = nodeIndex(m.start);
+  const xIdx = new Set([...m.xSet].map(nodeIndex).filter(i => i >= 0));
+  const yIdx = new Set([...m.ySet].map(nodeIndex).filter(i => i >= 0));
+  a.startIdx = startIdx; a.xIdx = xIdx; a.yIdx = yIdx;
+  try{
+    a.solve = m.mode === "hit"
+      ? solveHitPure(a.P, startIdx, xIdx, yIdx)
+      : solveExpectedPure(a.P, startIdx, xIdx);
+  }catch(err){
+    a.solveError = err.message || "Computation failed.";
+  }
+  state.analysis = a;
+  return a;
+}
+
+/* ---------- presets ---------- */
+function mkModel(nodes, edges, opts = {}){
+  const m = blankModel();
+  m.nodes = nodes.map(([label, x, y], i) => ({ id: "n" + (i + 1), label, x, y, pinned: true }));
+  m.edges = edges.map(([f, t, p]) => ({ from: "n" + (f + 1), to: "n" + (t + 1), p }));
+  m.start = "n" + ((opts.start ?? 0) + 1);
+  m.xSet = new Set((opts.x ?? []).map(i => "n" + (i + 1)));
+  m.ySet = new Set((opts.y ?? []).map(i => "n" + (i + 1)));
+  m.mode = opts.mode ?? "hit";
+  m.nextId = nodes.length + 1;
+  return m;
+}
+const PRESETS = {
+  simple: () => mkModel(
+    [["A", 260, 330], ["B", 560, 180], ["C", 560, 480], ["D", 880, 330]],
+    [[0,1,.55],[0,2,.45],[1,3,.7],[1,2,.3],[2,1,.4],[2,3,.6],[3,3,1]],
+    { start: 0, x: [3], y: [2], mode: "hit" }
+  ),
+  weather: () => mkModel(
+    [["Sunny", 350, 210], ["Cloudy", 760, 210], ["Rainy", 555, 490]],
+    [[0,0,.6],[0,1,.3],[0,2,.1],[1,0,.3],[1,1,.4],[1,2,.3],[2,0,.2],[2,1,.3],[2,2,.5]],
+    { start: 0, x: [2], mode: "expected" }
+  ),
+  gambler: () => mkModel(
+    [["$0", 150, 330], ["$1", 320, 330], ["$2", 490, 330], ["$3", 660, 330], ["$4", 830, 330], ["$5", 1000, 330]],
+    [[0,0,1],[1,0,.5],[1,2,.5],[2,1,.5],[2,3,.5],[3,2,.5],[3,4,.5],[4,3,.5],[4,5,.5],[5,5,1]],
+    { start: 2, x: [5], y: [0], mode: "hit" }
+  ),
+  coin: () => mkModel(
+    [["∅", 300, 330], ["H", 600, 330], ["HH", 900, 330]],
+    [[0,0,.5],[0,1,.5],[1,0,.5],[1,2,.5],[2,2,1]],
+    { start: 0, x: [2], mode: "expected" }
+  ),
+  cycle: () => mkModel(
+    [["A", 600, 150], ["B", 930, 330], ["C", 600, 510], ["D", 270, 330]],
+    [[0,1,1],[1,2,1],[2,3,1],[3,0,1]],
+    { start: 0, x: [2], mode: "expected" }
+  )
+};
+
+/* ---------- model operations ---------- */
+function addNodeAt(x, y){
+  apply(() => {
+    const id = uid();
+    const label = String.fromCharCode(65 + (state.model.nodes.length % 26));
+    state.model.nodes.push({ id, label, x, y, pinned: true });
+    if(!state.model.start) state.model.start = id;
+    state.ui.selection = { type: "node", id };
+  });
+  focusInspectorLabel();
+}
+function addNodeAuto(){
+  apply(() => {
+    const id = uid();
+    const label = String.fromCharCode(65 + (state.model.nodes.length % 26));
+    state.model.nodes.push({ id, label, x: 600, y: 330, pinned: false });
+    if(!state.model.start) state.model.start = id;
+    state.ui.selection = { type: "node", id };
+  });
+  glideToPolygon();
+  focusInspectorLabel();
+}
+function focusInspectorLabel(){
+  requestAnimationFrame(() => {
+    const inp = $("insp-label");
+    if(inp && !inp.disabled){ inp.focus(); inp.select(); }
+  });
+}
+function deleteNode(id){
+  apply(() => {
+    const m = state.model;
+    m.nodes = m.nodes.filter(n => n.id !== id);
+    m.edges = m.edges.filter(e => e.from !== id && e.to !== id);
+  });
+}
+function upsertEdge(from, to, p, select = true){
+  if(!from || !to || !Number.isFinite(p) || p < 0 || p > 1) return;
+  apply(() => {
+    const m = state.model;
+    const existing = m.edges.find(e => e.from === from && e.to === to);
+    if(p <= 0){
+      m.edges = m.edges.filter(e => !(e.from === from && e.to === to));
+      if(select) state.ui.selection = null;
+      return;
+    }
+    if(existing) existing.p = p;
+    else m.edges.push({ from, to, p });
+    if(select) state.ui.selection = { type: "edge", key: from + "|" + to };
+  });
+}
+function deleteEdge(key){
+  const [from, to] = key.split("|");
+  apply(() => {
+    state.model.edges = state.model.edges.filter(e => !(e.from === from && e.to === to));
+  });
+}
+function remainingMass(fromId){
+  let s = 0;
+  for(const e of state.model.edges) if(e.from === fromId) s += e.p;
+  return clamp(Math.round((1 - s) * 1000) / 1000, 0, 1);
+}
+function polygonTargets(){
+  const nodes = state.model.nodes;
+  const total = nodes.length;
+  const targets = new Map();
+  if(!total) return targets;
+  const cx = 600, cy = 330;
+  if(total === 1){ targets.set(nodes[0].id, { x: cx, y: cy }); return targets; }
+  const r = Math.max(180, 60 + 15.5 * total);
+  nodes.forEach((node, i) => {
+    const ang = total === 2 ? (i === 0 ? Math.PI : 0) : -Math.PI / 2 + (2 * Math.PI * i) / total;
+    targets.set(node.id, { x: Math.round(cx + Math.cos(ang) * r), y: Math.round(cy + Math.sin(ang) * r) });
+  });
+  return targets;
+}
+function animateLayoutTo(targets, fitV){
+  cancelLayoutAnim();
+  const nodes = state.model.nodes;
+  const applyFinal = () => {
+    for(const n of nodes){ const t = targets.get(n.id); if(t){ n.x = t.x; n.y = t.y; } }
+    if(fitV){ state.ui.view = fitV; applyView(); }
+    renderGraph();
+    saveLocal();
+  };
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches){ applyFinal(); return; }
+  const starts = new Map(nodes.map(n => [n.id, { x: n.x, y: n.y }]));
+  const v0 = { ...state.ui.view };
+  const t0 = performance.now();
+  const dur = 520;
+  const ease = x => 1 - Math.pow(1 - x, 3);
+  const anim = { raf: 0, watchdog: 0 };
+  const finishNow = () => {
+    if(layoutAnim !== anim) return;
+    cancelLayoutAnim();
+    applyFinal();
+  };
+  const frame = (now) => {
+    const u = clamp((now - t0) / dur, 0, 1);
+    const e = ease(u);
+    for(const n of nodes){
+      const s = starts.get(n.id), t = targets.get(n.id);
+      if(!s || !t) continue;
+      n.x = s.x + (t.x - s.x) * e;
+      n.y = s.y + (t.y - s.y) * e;
+    }
+    if(fitV){
+      state.ui.view.x = v0.x + (fitV.x - v0.x) * e;
+      state.ui.view.y = v0.y + (fitV.y - v0.y) * e;
+      state.ui.view.k = v0.k + (fitV.k - v0.k) * e;
+      applyView();
+    }
+    renderGraph();
+    if(u < 1) anim.raf = requestAnimationFrame(frame);
+    else finishNow();
+  };
+  anim.watchdog = setTimeout(finishNow, dur + 160);
+  layoutAnim = anim;
+  anim.raf = requestAnimationFrame(frame);
+}
+function glideToPolygon(){
+  const targets = polygonTargets();
+  if(!targets.size) return;
+  for(const n of state.model.nodes) n.pinned = false;
+  const fitV = computeFitView([...targets.values()]);
+  animateLayoutTo(targets, fitV);
+}
+function autoLayout(){
+  if(!state.model.nodes.length) return;
+  recordSnapshot();
+  updateHeaderButtons();
+  glideToPolygon();
+}
+
+/* ============================================================
+   Part 2: view (zoom/pan), graph rendering, panels, charts
+   ============================================================ */
+const SVGNS = "http://www.w3.org/2000/svg";
+const svg = $("graph"), world = $("world");
+const edgeLayer = $("edge-layer"), nodeLayer = $("node-layer"), fxLayer = $("fx-layer"), tokenLayer = $("token-layer");
+const ICONS = {
+  check: '<svg class="icon" viewBox="0 0 24 24"><path d="M4 12l5 5L20 7"></path></svg>',
+  alert: '<svg class="icon" viewBox="0 0 24 24"><path d="M10.3 3.9 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>',
+  info: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 8h.01"></path><path d="M12 12v5"></path></svg>',
+  trash: '<svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>',
+  flag: '<svg class="icon" viewBox="0 0 24 24"><path d="M5 21V4c3.5-2 7 2 11 0v10c-4 2-7.5-2-11 0"></path></svg>',
+  play: '<svg class="icon filled" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>',
+  pause: '<svg class="icon filled" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1"></rect><rect x="13.5" y="5" width="4" height="14" rx="1"></rect></svg>',
+  sun: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>',
+  moon: '<svg class="icon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>'
+};
+
+/* ---------- view: zoom & pan ---------- */
+function applyView(){
+  const v = state.ui.view;
+  world.setAttribute("transform", `translate(${v.x} ${v.y}) scale(${v.k})`);
+  $("zoom-note").textContent = Math.round(v.k * 100) + "%";
+}
+function svgPoint(evt){
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+function pointerToWorld(evt){
+  const p = svgPoint(evt), v = state.ui.view;
+  return { x: (p.x - v.x) / v.k, y: (p.y - v.y) / v.k };
+}
+function worldToClient(x, y){
+  const v = state.ui.view;
+  const pt = svg.createSVGPoint();
+  pt.x = v.x + x * v.k; pt.y = v.y + y * v.k;
+  const sp = pt.matrixTransform(svg.getScreenCTM());
+  const r = $("graph-wrap").getBoundingClientRect();
+  return { x: sp.x - r.left, y: sp.y - r.top };
+}
+function visibleCenter(){
+  const r = svg.getBoundingClientRect();
+  return pointerToWorld({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
+}
+function zoomAt(factor, clientX, clientY){
+  const v = state.ui.view;
+  const p = svgPoint({ clientX, clientY });
+  const k2 = clamp(v.k * factor, 0.2, 3);
+  v.x = p.x - (p.x - v.x) * (k2 / v.k);
+  v.y = p.y - (p.y - v.y) * (k2 / v.k);
+  v.k = k2;
+  applyView();
+}
+function zoomCenter(factor){
+  const r = svg.getBoundingClientRect();
+  zoomAt(factor, r.left + r.width / 2, r.top + r.height / 2);
+}
+function computeFitView(points){
+  if(!points.length) return { x: 0, y: 0, k: 1 };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for(const p of points){
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }
+  const pad = 105;
+  minX -= pad; maxX += pad; minY -= pad; maxY += pad;
+  const r = svg.getBoundingClientRect();
+  if(!r.width || !r.height) return null;
+  const scale = Math.max(r.width / 1200, r.height / 660);
+  const visW = r.width / scale, visH = r.height / scale;
+  const k = clamp(Math.min(visW / (maxX - minX), visH / (maxY - minY)), 0.2, 1.6);
+  return { x: 600 - k * (minX + maxX) / 2, y: 330 - k * (minY + maxY) / 2, k };
+}
+function fitView(){
+  const v = computeFitView(state.model.nodes.map(n => ({ x: n.x, y: n.y })));
+  if(!v) return;
+  state.ui.view = v;
+  applyView();
+}
+
+/* ---------- edge geometry ---------- */
+function edgeGeometry(f, t, curved){
+  if(f.id === t.id){
+    const x = f.x, y = f.y;
+    return { path: `M ${x - 5} ${y - NODE_R + 2} C ${x - 66} ${y - 84}, ${x + 66} ${y - 84}, ${x + 5} ${y - NODE_R + 2}`, labelX: x, labelY: y - 82 };
+  }
+  const dx = t.x - f.x, dy = t.y - f.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const sx = f.x + ux * NODE_R, sy = f.y + uy * NODE_R;
+  const tx = t.x - ux * (NODE_R + 7), ty = t.y - uy * (NODE_R + 7);
+  const mx = (sx + tx) / 2, my = (sy + ty) / 2;
+  const off = curved ? 26 : 0;
+  const cx = mx - uy * off, cy = my + ux * off;
+  return { path: `M ${sx} ${sy} Q ${cx} ${cy} ${tx} ${ty}`, labelX: cx, labelY: cy - 8 };
+}
+function edgeKeyOf(e){ return e.from + "|" + e.to; }
+
+/* ---------- graph rendering ---------- */
+function renderGraph(a = state.analysis){
+  edgeLayer.innerHTML = ""; nodeLayer.innerHTML = "";
+  const m = state.model;
+  const byId = new Map(m.nodes.map(n => [n.id, n]));
+  const hasReverse = new Set();
+  for(const e of m.edges)
+    if(e.from !== e.to && m.edges.some(o => o.from === e.to && o.to === e.from)) hasReverse.add(edgeKeyOf(e));
+  const sel = state.ui.selection;
+  for(const e of m.edges){
+    const f = byId.get(e.from), t = byId.get(e.to);
+    if(!f || !t) continue;
+    const key = edgeKeyOf(e);
+    const isSel = sel?.type === "edge" && sel.key === key;
+    const g = document.createElementNS(SVGNS, "g");
+    g.setAttribute("class", "edge" + (isSel ? " selected" : ""));
+    g.dataset.key = key;
+    const geom = edgeGeometry(f, t, hasReverse.has(key));
+    const w = (1.4 + 2.6 * e.p).toFixed(2);
+    g.innerHTML =
+      `<path class="edge-hit" d="${geom.path}"></path>` +
+      `<path class="edge-path" style="stroke-width:${w}px" d="${geom.path}" marker-end="url(#${isSel ? "arrow-sel" : "arrow"})"></path>` +
+      `<text class="edge-label" x="${geom.labelX}" y="${geom.labelY}">${fmt(e.p)}</text>`;
+    edgeLayer.appendChild(g);
+  }
+  const values = a?.solve ? a.solve.values : null;
+  let maxFinite = 0;
+  if(values && m.mode === "expected")
+    for(const v of values) if(Number.isFinite(v)) maxFinite = Math.max(maxFinite, v);
+  m.nodes.forEach((node, i) => {
+    const g = document.createElementNS(SVGNS, "g");
+    const cls = ["node",
+      sel?.type === "node" && sel.id === node.id ? "selected" : "",
+      m.xSet.has(node.id) ? "is-x" : "",
+      m.ySet.has(node.id) && m.mode === "hit" ? "is-y" : "",
+      m.start === node.id ? "is-start" : "",
+      sim.active && sim.cur === node.id ? "is-current" : "",
+      state.ui.connectFrom === node.id ? "connect-src" : ""
+    ].filter(Boolean).join(" ");
+    g.setAttribute("class", cls);
+    g.setAttribute("transform", `translate(${node.x} ${node.y})`);
+    g.dataset.id = node.id;
+    const v = values ? values[i] : null;
+    const vt = v == null ? "" : (m.mode === "hit" ? fmtPct(v) : fmtExp(v));
+    let fillAttr = "";
+    if(state.ui.heat && v != null && Number.isFinite(v)){
+      const t = m.mode === "hit" ? v : (maxFinite > 0 ? v / maxFinite : 0);
+      fillAttr = ` style="fill:color-mix(in srgb, var(--heat-hi) ${Math.round(clamp(t, 0, 1) * 52)}%, var(--node-fill))"`;
+    }
+    const badges = [];
+    if(m.xSet.has(node.id))
+      badges.push('<g class="node-badge bx" transform="translate(24 -26)"><rect x="-11" y="-9" width="22" height="18" rx="6"></rect><text y="1">X</text></g>');
+    if(m.ySet.has(node.id) && m.mode === "hit")
+      badges.push('<g class="node-badge by" transform="translate(24 -26)"><rect x="-11" y="-9" width="22" height="18" rx="6"></rect><text y="1">Y</text></g>');
+    g.innerHTML =
+      `<circle class="pulse-ring" r="34"></circle><circle class="start-ring" r="38"></circle>` +
+      `<circle class="base" r="${NODE_R}"${fillAttr}></circle>` +
+      `<text class="label" y="${vt ? -5 : 1}">${escapeHtml(displayLabel(node))}</text>` +
+      (vt ? `<text class="value" y="13">${escapeHtml(vt)}</text>` : "") +
+      badges.join("");
+    nodeLayer.appendChild(g);
+  });
+  positionToken();
+}
+
+/* ---------- inspector ---------- */
+function renderInspector(){
+  const box = $("inspector");
+  const sel = state.ui.selection;
+  const m = state.model;
+  if(state.ui.connectMode && !sel){
+    box.innerHTML = `<span class="insp-kind">connect</span><span class="insp-hint">${
+      state.ui.connectFrom
+        ? `Source: <b>${escapeHtml(labelFor(state.ui.connectFrom))}</b> — click a target (same state = self-loop).`
+        : "Click the source state, then the target. <b>Esc</b> exits."
+    }</span>`;
+    return;
+  }
+  if(!sel){
+    box.innerHTML = `<span class="insp-hint">
+      <span><b>Double-click</b> — new state</span>
+      <span><b>Shift + drag</b> — edge</span>
+      <span><b>Scroll</b> — zoom</span>
+      <span><b>Del</b> — delete selection</span>
+      <span><b>?</b> — guide</span></span>`;
+    return;
+  }
+  if(sel.type === "node"){
+    const node = nodeById(sel.id);
+    if(!node){ state.ui.selection = null; renderInspector(); return; }
+    const a = state.analysis;
+    const i = nodeIndex(node.id);
+    const sum = a?.sums?.[i] ?? 0;
+    const sumCls = sum > 1 + SUM_TOL ? "bad" : (Math.abs(sum - 1) < SUM_TOL ? "ok" : (m.autoLoop ? "ok" : "warn"));
+    box.innerHTML = `
+      <span class="insp-kind">state</span>
+      <span class="insp-field"><label class="visually-hidden" for="insp-label">State name</label>
+        <input id="insp-label" type="text" maxlength="24" value="${escapeHtml(node.label ?? "")}" placeholder="${escapeHtml(node.id)}"></span>
+      <span class="pill ${sumCls}" title="Sum of outgoing probabilities">Σ out <span class="insp-sum">${fmt(sum)}</span></span>
+      <span class="insp-actions">
+        <button type="button" class="role-btn ${m.start === node.id ? "on-start" : ""}" id="insp-start" aria-pressed="${m.start === node.id}">${ICONS.flag}Start</button>
+        <button type="button" class="role-btn ${m.xSet.has(node.id) ? "on-x" : ""}" id="insp-x" aria-pressed="${m.xSet.has(node.id)}">X</button>
+        <button type="button" class="role-btn ${m.ySet.has(node.id) ? "on-y" : ""}" id="insp-y" aria-pressed="${m.ySet.has(node.id)}">Y</button>
+        <button type="button" class="icon-btn" id="insp-del" title="Delete state (Del)" aria-label="Delete state">${ICONS.trash}</button>
+      </span>`;
+    const labelInput = $("insp-label");
+    let snapped = false;
+    labelInput.addEventListener("input", () => {
+      if(!snapped){ recordSnapshot(); snapped = true; }
+      node.label = labelInput.value;
+      renderGraph();
+    });
+    labelInput.addEventListener("change", () => { saveLocal(); render(); });
+    labelInput.addEventListener("keydown", (e) => { if(e.key === "Enter") labelInput.blur(); });
+    $("insp-start").addEventListener("click", () => apply(() => { state.model.start = node.id; }));
+    $("insp-x").addEventListener("click", () => toggleRole(node.id, "x"));
+    $("insp-y").addEventListener("click", () => toggleRole(node.id, "y"));
+    $("insp-del").addEventListener("click", () => deleteNode(node.id));
+    return;
+  }
+  const [from, to] = sel.key.split("|");
+  const edge = m.edges.find(e => e.from === from && e.to === to);
+  if(!edge){ state.ui.selection = null; renderInspector(); return; }
+  box.innerHTML = `
+    <span class="insp-kind">edge</span>
+    <span class="insp-field"><b>${escapeHtml(labelFor(from))}</b>&nbsp;→&nbsp;<b>${escapeHtml(labelFor(to))}</b></span>
+    <span class="insp-field"><label for="insp-prob">p&nbsp;=</label>
+      <input id="insp-prob" type="number" min="0" max="1" step="0.05" value="${edge.p}"></span>
+    <span class="insp-actions">
+      <button type="button" class="icon-btn" id="insp-edel" title="Delete edge (Del)" aria-label="Delete edge">${ICONS.trash}</button>
+    </span>`;
+  const probInput = $("insp-prob");
+  probInput.addEventListener("change", () => {
+    const p = clamp(+probInput.value, 0, 1);
+    if(Number.isFinite(p)) upsertEdge(from, to, p);
+  });
+  probInput.addEventListener("keydown", (e) => { if(e.key === "Enter") probInput.blur(); });
+  $("insp-edel").addEventListener("click", () => deleteEdge(sel.key));
+}
+function toggleRole(id, role){
+  apply(() => {
+    const m = state.model;
+    if(role === "x"){
+      if(m.xSet.has(id)) m.xSet.delete(id);
+      else { m.xSet.add(id); m.ySet.delete(id); }
+    }else{
+      if(m.ySet.has(id)) m.ySet.delete(id);
+      else if(!m.xSet.has(id)) m.ySet.add(id);
+    }
+  });
+}
+
+/* ---------- status ---------- */
+function renderStatus(a){
+  const pill = $("status-pill");
+  pill.className = "pill";
+  if(a.n === 0){ pill.textContent = "empty"; pill.title = "Add states to the canvas."; return; }
+  if(a.errors.length){
+    pill.classList.add("bad");
+    pill.innerHTML = `${ICONS.alert}invalid`;
+    pill.title = a.errors[0];
+    return;
+  }
+  const missing = a.sums.some(s => s < 1 - SUM_TOL);
+  pill.classList.add("ok");
+  pill.innerHTML = `${ICONS.check}${missing && state.model.autoLoop ? "OK · auto" : "OK"}`;
+  pill.title = missing && state.model.autoLoop
+    ? "Valid — missing mass is auto-completed as self-loops."
+    : "Valid stochastic chain.";
+}
+
+/* ---------- components: bars & legend ---------- */
+function barList(items, { color = "var(--s1)", max = 1 } = {}){
+  if(!items.length) return `<div class="empty">Nothing to display.</div>`;
+  return `<div class="bars">` + items.map(it => {
+    const inf = it.value === Infinity;
+    const w = inf || !Number.isFinite(it.value) ? 0 : clamp(it.value / (max || 1), 0, 1) * 100;
+    const c = it.color || color;
+    return `<div class="bar-row">
+      <span class="bar-label" title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</span>
+      <span class="bar-track"><span class="bar-fill" style="--c:${c};width:${w.toFixed(2)}%"></span></span>
+      <span class="bar-val">${inf ? '<span class="inf">∞</span>' : escapeHtml(it.display ?? fmt(it.value))}</span>
+    </div>`;
+  }).join("") + `</div>`;
+}
+function pairedBars(items, nameA, nameB){
+  const hasB = items.some(it => it.b != null);
+  const legend = hasB
+    ? `<div class="legend"><span class="key"><i style="--c:var(--s1)"></i>${escapeHtml(nameA)}</span><span class="key"><i style="--c:var(--s2)"></i>${escapeHtml(nameB)}</span></div>`
+    : "";
+  const rows = items.map(it => {
+    const wa = clamp(it.a, 0, 1) * 100;
+    const wb = it.b == null ? null : clamp(it.b, 0, 1) * 100;
+    return `<div class="bar-row">
+      <span class="bar-label" title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</span>
+      <span class="pair-tracks">
+        <span class="bar-track"><span class="bar-fill" style="--c:var(--s1);width:${wa.toFixed(2)}%"></span></span>
+        ${wb == null ? "" : `<span class="bar-track"><span class="bar-fill" style="--c:var(--s2);width:${wb.toFixed(2)}%"></span></span>`}
+      </span>
+      <span class="bar-val two"><span>${fmtPct(it.a)}</span>${wb == null ? "" : `<i>${fmtPct(it.b)}</i>`}</span>
+    </div>`;
+  }).join("");
+  return legend + `<div class="bars" style="margin-top:8px">${rows}</div>`;
+}
+
+/* ---------- line chart (distribution evolution) ---------- */
+function renderLineChart(host, seriesList, nSteps){
+  const W = Math.max(260, host.clientWidth - 22 || 320), H = 200;
+  const mL = 38, mR = 10, mT = 12, mB = 24;
+  const pw = W - mL - mR, ph = H - mT - mB;
+  let yMax = 0;
+  for(const s of seriesList) for(const v of s.values) yMax = Math.max(yMax, v);
+  const yTop = yMax > 0.82 ? 1 : Math.max(0.05, Math.ceil(yMax * 20) / 20);
+  const xs = i => mL + pw * (nSteps ? i / nSteps : 0);
+  const ys = v => mT + ph * (1 - v / yTop);
+  const yTicks = [0, yTop / 2, yTop];
+  const xTickCount = Math.min(5, nSteps);
+  const xTicks = [...new Set(Array.from({ length: xTickCount + 1 }, (_, i) => Math.round(nSteps * i / xTickCount)))];
+  let g = "";
+  for(const t of yTicks){
+    g += `<line class="gridline" x1="${mL}" x2="${W - mR}" y1="${ys(t)}" y2="${ys(t)}"></line>`;
+    g += `<text class="tick-label" x="${mL - 6}" y="${ys(t) + 3.5}" text-anchor="end">${fmt(t)}</text>`;
+  }
+  for(const t of xTicks)
+    g += `<text class="tick-label" x="${xs(t)}" y="${H - 8}" text-anchor="middle">${t}</text>`;
+  g += `<line class="axisline" x1="${mL}" x2="${W - mR}" y1="${ys(0)}" y2="${ys(0)}"></line>`;
+  let paths = "";
+  for(const s of seriesList){
+    const d = s.values.map((v, i) => `${i ? "L" : "M"}${xs(i).toFixed(1)} ${ys(v).toFixed(1)}`).join(" ");
+    paths += `<path class="serie" stroke="${s.color}" d="${d}"></path>`;
+  }
+  host.innerHTML = `<div class="chart-card">
+    <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Distribution evolution over ${nSteps} steps">
+      ${g}${paths}
+      <line class="crosshair" id="evo-cross" y1="${mT}" y2="${mT + ph}" visibility="hidden"></line>
+      <g id="evo-dots"></g>
+      <rect id="evo-hover" x="${mL}" y="${mT}" width="${pw}" height="${ph}" fill="transparent"></rect>
+    </svg>
+    <div class="chart-tip" id="evo-tip"></div>
+    <div class="legend">${seriesList.map(s => `<span class="key"><i style="--c:${s.color}"></i>${escapeHtml(s.label)}</span>`).join("")}</div>
+  </div>`;
+  const hover = host.querySelector("#evo-hover");
+  const cross = host.querySelector("#evo-cross");
+  const dots = host.querySelector("#evo-dots");
+  const tip = host.querySelector("#evo-tip");
+  const card = host.querySelector(".chart-card");
+  const svgEl = host.querySelector("svg");
+  function showAt(clientX, clientY){
+    const r = svgEl.getBoundingClientRect();
+    const scaleX = r.width / W;
+    const px = (clientX - r.left) / scaleX;
+    const idx = clamp(Math.round((px - mL) / pw * nSteps), 0, nSteps);
+    const x = xs(idx);
+    cross.setAttribute("x1", x); cross.setAttribute("x2", x);
+    cross.setAttribute("visibility", "visible");
+    dots.innerHTML = seriesList.map(s =>
+      `<circle class="hover-dot" cx="${x}" cy="${ys(s.values[idx])}" r="4.5" fill="${s.color}"></circle>`).join("");
+    const rows = seriesList
+      .map(s => ({ label: s.label, color: s.color, v: s.values[idx] }))
+      .sort((a, b) => b.v - a.v)
+      .slice(0, 8)
+      .map(rr => `<div class="tip-r"><i style="--c:${rr.color}"></i><span>${escapeHtml(rr.label)}</span><b>${fmtPct(rr.v)}</b></div>`)
+      .join("");
+    tip.innerHTML = `<div class="tip-t">step ${idx}</div>${rows}`;
+    tip.style.display = "block";
+    const cardR = card.getBoundingClientRect();
+    const tipW = tip.offsetWidth, tipH = tip.offsetHeight;
+    let lx = clientX - cardR.left + 14;
+    if(lx + tipW > cardR.width - 6) lx = clientX - cardR.left - tipW - 14;
+    let ly = clamp(clientY - cardR.top - tipH / 2, 4, cardR.height - tipH - 4);
+    tip.style.left = Math.max(4, lx) + "px";
+    tip.style.top = ly + "px";
+  }
+  hover.addEventListener("pointermove", e => showAt(e.clientX, e.clientY));
+  hover.addEventListener("pointerdown", e => showAt(e.clientX, e.clientY));
+  hover.addEventListener("pointerleave", () => {
+    cross.setAttribute("visibility", "hidden");
+    dots.innerHTML = ""; tip.style.display = "none";
+  });
+}
+
+/* ---------- tab: Solve ---------- */
+function chipRowHtml(setName){
+  const m = state.model;
+  if(!m.nodes.length) return `<span class="hint">Add states to the canvas first.</span>`;
+  return m.nodes.map(n => {
+    const inX = m.xSet.has(n.id), inY = m.ySet.has(n.id);
+    const on = setName === "x" ? inX : inY;
+    const dis = setName === "y" && inX;
+    return `<button type="button" class="chip${on ? (setName === "x" ? " on-x" : " on-y") : ""}"
+      data-set="${setName}" data-id="${escapeHtml(n.id)}" aria-pressed="${on}"${dis ? " disabled" : ""}
+      ${dis ? 'title="Already in X"' : ""}>${on ? ICONS.check : ""}${escapeHtml(displayLabel(n))}</button>`;
+  }).join("");
+}
+function renderSolveTab(a){
+  const m = state.model;
+  document.querySelectorAll("#mode-seg .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === m.mode));
+  $("mode-hint").textContent = m.mode === "hit"
+    ? "The probability that the chain, starting from the start state, reaches set X before set Y."
+    : "The expected number of transitions from the start state until set X is first reached.";
+  $("yset-field").style.display = m.mode === "hit" ? "" : "none";
+  const sSel = $("start-select");
+  sSel.innerHTML = m.nodes.map(n =>
+    `<option value="${escapeHtml(n.id)}"${n.id === m.start ? " selected" : ""}>${escapeHtml(displayLabel(n))}</option>`
+  ).join("") || `<option value="">— no states —</option>`;
+  sSel.disabled = !m.nodes.length;
+  $("xset-chips").innerHTML = chipRowHtml("x");
+  $("yset-chips").innerHTML = chipRowHtml("y");
+  $("autoloop").checked = m.autoLoop;
+  $("heat-toggle").checked = state.ui.heat;
+  renderResultCard(a);
+}
+function renderResultCard(a){
+  const box = $("result-card");
+  const m = state.model;
+  if(a.errors.length || a.solveError){
+    box.innerHTML = `<div class="message error">${ICONS.alert}<span>${escapeHtml(a.errors[0] || a.solveError)}</span></div>`;
+    return;
+  }
+  const r = a.solve;
+  if(!r){ box.innerHTML = `<div class="message">${ICONS.info}<span>Choose a start state and the target sets.</span></div>`; return; }
+  const startLabel = labelFor(m.start);
+  const isHit = m.mode === "hit";
+  const hero = isHit ? fmtPct(r.startValue) : fmtExp(r.startValue);
+  const label = isHit ? `P( reach X before Y ) from ${startLabel}` : `E[ steps to X ] from ${startLabel}`;
+  let note = isHit
+    ? "Exact result — absorption system solved by Gaussian elimination."
+    : "Every transition (self-loops included) counts as one step.";
+  if(!isHit && r.startValue === Infinity)
+    note = "Infinite time: from the start, a closed class without X is reachable.";
+  let maxFinite = 0;
+  for(const v of r.values) if(Number.isFinite(v)) maxFinite = Math.max(maxFinite, v);
+  const items = m.nodes.map((n, i) => ({
+    label: displayLabel(n),
+    value: r.values[i],
+    display: isHit ? fmtPct(r.values[i]) : fmtExp(r.values[i])
+  }));
+  box.innerHTML = `
+    <div class="result-label">${escapeHtml(label)}</div>
+    <div class="result-hero">${escapeHtml(hero)}</div>
+    <div class="result-note">${escapeHtml(note)}</div>
+    ${barList(items, { max: isHit ? 1 : (maxFinite || 1) })}
+    <div class="result-meta">max residual |Ax−b| = ${r.residual.toExponential(1)}</div>`;
+}
+
+/* ---------- tab: Distributions ---------- */
+function renderDistTab(a){
+  const statBox = $("stationary-box");
+  const evoBox = $("evo-box");
+  $("evo-steps").value = state.ui.evoSteps;
+  $("evo-steps-out").textContent = state.ui.evoSteps;
+  $("evo-dist0").value = state.ui.evoDist;
+  if(a.errors.length || !a.n){
+    const msg = `<div class="message error">${ICONS.alert}<span>${escapeHtml(a.errors[0] || "Add states to analyze the chain.")}</span></div>`;
+    statBox.innerHTML = msg; evoBox.innerHTML = "";
+    return;
+  }
+  const cls = a.cls, st = a.stationary;
+  const badges = [];
+  badges.push(cls.irreducible
+    ? `<span class="pill ok">${ICONS.check}irreducible</span>`
+    : `<span class="pill">${cls.comps.length} communicating classes</span>`);
+  if(cls.irreducible){
+    badges.push(cls.aperiodic
+      ? `<span class="pill ok">${ICONS.check}aperiodic</span>`
+      : `<span class="pill warn">${ICONS.alert}periodic · d = ${cls.period[0]}</span>`);
+    if(cls.aperiodic) badges.push(`<span class="pill accent">ergodic — πₙ → π</span>`);
+  }
+  let stHtml = `<div class="badge-row">${badges.join("")}</div>`;
+  if(st.full){
+    const items = st.list[0].states.map((s, k) => ({
+      label: a.labels[s], value: st.list[0].pi[k], display: fmtPct(st.list[0].pi[k])
+    }));
+    stHtml += barList(items, { max: Math.max(...st.list[0].pi, 0.0001) });
+    if(cls.irreducible && !cls.aperiodic)
+      stHtml += `<p class="hint" style="margin-top:8px">π exists and is unique, but the chain is periodic, so πₙ does not converge — it oscillates around π.</p>`;
+  }else if(st.list.length === 0){
+    stHtml += `<div class="message warn">${ICONS.alert}<span>No recurrent classes — check the chain.</span></div>`;
+  }else{
+    state.ui.statClass = clamp(state.ui.statClass, 0, st.list.length - 1);
+    stHtml += `<div class="message warn" style="margin-bottom:9px">${ICONS.alert}<span>π is not unique: there are ${st.list.length} closed recurrent classes. Pick one:</span></div>`;
+    stHtml += `<div class="chip-row" style="margin-bottom:9px">` + st.list.map((c, i) =>
+      `<button type="button" class="chip mini${i === state.ui.statClass ? " on-x" : ""}" data-statclass="${i}" aria-pressed="${i === state.ui.statClass}">{ ${c.states.map(s => escapeHtml(a.labels[s])).join(", ")} }</button>`
+    ).join("") + `</div>`;
+    const c = st.list[state.ui.statClass];
+    if(c.pi){
+      const items = c.states.map((s, k) => ({ label: a.labels[s], value: c.pi[k], display: fmtPct(c.pi[k]) }));
+      stHtml += barList(items, { max: Math.max(...c.pi, 0.0001) });
+    }else{
+      stHtml += `<div class="message error">${ICONS.alert}<span>${escapeHtml(c.err || "Computation error.")}</span></div>`;
+    }
+  }
+  statBox.innerHTML = stHtml;
+  statBox.querySelectorAll("[data-statclass]").forEach(b =>
+    b.addEventListener("click", () => { state.ui.statClass = +b.dataset.statclass; renderDistTab(state.analysis); }));
+
+  /* evolution */
+  const n = a.n;
+  let v0;
+  if(state.ui.evoDist === "uniform") v0 = new Array(n).fill(1 / n);
+  else{
+    v0 = new Array(n).fill(0);
+    const si = a.startIdx >= 0 ? a.startIdx : 0;
+    v0[si] = 1;
+  }
+  const steps = state.ui.evoSteps;
+  const evo = evolution(a.P, v0, steps);
+  let order = a.P.map((_, i) => i);
+  let folded = null;
+  if(n > 8){
+    const peak = order.map(i => ({ i, m: Math.max(...evo.map(row => row[i])) }));
+    peak.sort((x, y) => y.m - x.m);
+    order = peak.slice(0, 7).map(o => o.i).sort((x, y) => x - y);
+    folded = peak.slice(7).map(o => o.i);
+  }
+  const seriesList = order.map((i, k) => ({
+    label: a.labels[i],
+    color: SERIES[n > 8 ? k : i % 8],
+    values: evo.map(row => row[i])
+  }));
+  if(folded && folded.length){
+    seriesList.push({
+      label: "others (" + folded.length + ")",
+      color: "var(--s-other)",
+      values: evo.map(row => folded.reduce((s, i) => s + row[i], 0))
+    });
+  }
+  evoBox.innerHTML = "";
+  const chartHost = document.createElement("div");
+  evoBox.appendChild(chartHost);
+  renderLineChart(chartHost, seriesList, steps);
+  const last = evo[steps];
+  const finalItems = state.model.nodes.map((node, i) => ({
+    label: displayLabel(node), value: last[i], display: fmtPct(last[i]),
+    color: SERIES[n > 8 ? 0 : i % 8]
+  }));
+  const det = document.createElement("div");
+  det.innerHTML = `<h3 class="block-title">Distribution at step ${steps}</h3>` +
+    barList(finalItems, { max: Math.max(...last, 0.0001) });
+  evoBox.appendChild(det);
+}
+
+/* ---------- tab: Matrix ---------- */
+function shortLabel(s){ return s.length > 7 ? s.slice(0, 6) + "…" : s; }
+function rawSums(){
+  const sums = new Map(state.model.nodes.map(n => [n.id, 0]));
+  for(const e of state.model.edges) sums.set(e.from, (sums.get(e.from) ?? 0) + e.p);
+  return sums;
+}
+function renderMatrixTab(a){
+  const box = $("matrix-box");
+  const m = state.model;
+  if(!m.nodes.length){
+    box.innerHTML = `<div class="empty">Add states to the canvas — the matrix appears here.</div>`;
+    $("class-list").innerHTML = "";
+    return;
+  }
+  const act = document.activeElement;
+  const actCell = act && act.classList?.contains("cell") ? act.dataset.cell : null;
+  const sums = rawSums();
+  const edgeMap = new Map(m.edges.map(e => [edgeKeyOf(e), e.p]));
+  let html = `<div class="matrix-scroll"><table class="matrix-table"><thead><tr><th>P</th>`;
+  for(const n of m.nodes) html += `<th title="${escapeHtml(displayLabel(n))}">${escapeHtml(shortLabel(displayLabel(n)))}</th>`;
+  html += `<th>Σ</th></tr></thead><tbody>`;
+  for(const from of m.nodes){
+    const sum = sums.get(from.id) ?? 0;
+    const sumCls = sum > 1 + SUM_TOL ? "bad" : (Math.abs(sum - 1) < SUM_TOL ? "ok" : (m.autoLoop ? "ok" : "warn"));
+    const autoAdd = m.autoLoop && sum < 1 - SUM_TOL ? 1 - sum : 0;
+    html += `<tr><th title="${escapeHtml(displayLabel(from))}">${escapeHtml(shortLabel(displayLabel(from)))}</th>`;
+    for(const to of m.nodes){
+      const key = from.id + "|" + to.id;
+      const p = edgeMap.get(key);
+      const diag = from.id === to.id;
+      const ph = diag && autoAdd > SUM_TOL && p === undefined ? ` placeholder="${fmt(autoAdd)}" title="Auto self-loop: ${fmt(autoAdd)}"` : "";
+      html += `<td><input class="cell${p === undefined ? " zero" : ""}${diag ? " diag" : ""}" type="number" min="0" max="1" step="0.05"
+        data-cell="${escapeHtml(key)}" value="${p === undefined ? "" : p}"${ph}
+        aria-label="P(${escapeHtml(displayLabel(from))} → ${escapeHtml(displayLabel(to))})"></td>`;
+    }
+    html += `<td class="sum-cell ${sumCls}">${fmt(sum)}${autoAdd > SUM_TOL ? "+" : ""}</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+  box.innerHTML = html;
+  if(actCell){
+    const again = box.querySelector(`input[data-cell="${CSS.escape(actCell)}"]`);
+    if(again){ again.focus(); }
+  }
+  /* classification */
+  const listBox = $("class-list");
+  if(a.errors.length || !a.cls){ listBox.innerHTML = ""; return; }
+  const cls = a.cls;
+  listBox.innerHTML = cls.comps.map((comp) => {
+    const states = [...comp].sort((x, y) => x - y);
+    const ci = cls.compOf[states[0]];
+    const closed = cls.closed[ci];
+    const per = cls.period[ci];
+    const isAbs = states.length === 1 && cls.absorbing(states[0]);
+    return `<div class="class-row">
+      <span class="class-states">${states.map(s => `<span class="st">${escapeHtml(a.labels[s])}</span>`).join("")}</span>
+      ${isAbs ? `<span class="pill accent">absorbing</span>` : ""}
+      <span class="pill ${closed ? "ok" : ""}">${closed ? "closed · recurrent" : "open · transient"}</span>
+      <span class="pill" title="Class period">d = ${per || "—"}</span>
+    </div>`;
+  }).join("");
+}
+
+/* ---------- inline edge editor ---------- */
+let inlineEditKey = null;
+function openEdgeEditor(key){
+  const [from, to] = key.split("|");
+  const edge = state.model.edges.find(e => e.from === from && e.to === to);
+  const f = nodeById(from), t = nodeById(to);
+  if(!edge || !f || !t) return;
+  const hasRev = from !== to && state.model.edges.some(o => o.from === to && o.to === from);
+  const geom = edgeGeometry(f, t, hasRev);
+  const pos = worldToClient(geom.labelX, geom.labelY);
+  const ed = $("inline-editor"), input = $("inline-editor-input");
+  inlineEditKey = key;
+  ed.hidden = false;
+  ed.style.left = clamp(pos.x - 38, 4, $("graph-wrap").clientWidth - 84) + "px";
+  ed.style.top = clamp(pos.y - 18, 4, $("graph-wrap").clientHeight - 40) + "px";
+  input.value = edge.p;
+  input.focus();
+  input.select();
+}
+function closeEdgeEditor(commit){
+  const ed = $("inline-editor"), input = $("inline-editor-input");
+  if(ed.hidden) return;
+  const key = inlineEditKey;
+  ed.hidden = true;
+  inlineEditKey = null;
+  if(commit && key){
+    const p = clamp(+input.value, 0, 1);
+    if(Number.isFinite(p)){
+      const [from, to] = key.split("|");
+      upsertEdge(from, to, p);
+      return;
+    }
+  }
+  render();
+}
+
+/* ---------- toast & theme ---------- */
+function toast(msg, type = "info"){
+  const t = document.createElement("div");
+  t.className = "toast " + type;
+  t.innerHTML = (type === "ok" ? ICONS.check : type === "warn" ? ICONS.alert : ICONS.info) +
+    `<span>${escapeHtml(msg)}</span>`;
+  $("toasts").appendChild(t);
+  setTimeout(() => {
+    t.style.transition = "opacity .25s ease";
+    t.style.opacity = "0";
+    setTimeout(() => t.remove(), 260);
+  }, 3600);
+}
+function renderThemeButton(){
+  $("btn-theme").innerHTML = document.documentElement.dataset.theme === "dark" ? ICONS.sun : ICONS.moon;
+}
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  renderThemeButton();
+  saveLocal();
+}
+
+/* ---------- orchestration ---------- */
+function updateHeaderButtons(){
+  $("btn-undo").disabled = history.length === 0;
+  $("btn-redo").disabled = future.length === 0;
+}
+function setTab(tab){
+  state.ui.tab = tab;
+  document.querySelectorAll(".tab-btn").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === "tab-" + tab));
+  renderActiveTab();
+  saveLocal();
+}
+function renderActiveTab(a = state.analysis){
+  if(!a) return;
+  const t = state.ui.tab;
+  if(t === "solve") renderSolveTab(a);
+  else if(t === "dist") renderDistTab(a);
+  else if(t === "sim") renderSimTab(a);
+  else renderMatrixTab(a);
+}
+function render(){
+  const a = computeAnalysis();
+  renderStatus(a);
+  renderGraph(a);
+  renderInspector();
+  renderActiveTab(a);
+  updateHeaderButtons();
+}
+
+/* ============================================================
+   Part 3: simulation, Monte Carlo, events, initialization
+   ============================================================ */
+const SIM_ANIM_MAX_SPEED = 5;
+const SIM_BASE_RATE = 1.5; /* steps per second at 1× */
+const sim = {
+  active: false, running: false, busy: false,
+  cur: null, steps: 0, visits: new Map(), path: [],
+  timer: null, anim: null, speed: 1, carry: 0, lastTick: 0, stopOnTarget: true
+};
+function simSpeed(){ return clamp(Number.isFinite(sim.speed) ? sim.speed : 1, 0.25, 10000); }
+function setSimSpeed(v){
+  sim.speed = clamp(Number.isFinite(v) && v > 0 ? v : 1, 0.25, 10000);
+  saveLocal();
+  updateSimControls();
+}
+function simReady(){
+  const a = state.analysis;
+  return !!(a && a.n > 0 && !a.errors.length && state.model.start);
+}
+function simBlockReason(){
+  const a = state.analysis;
+  if(!a || !a.n) return "Add states to run a simulation.";
+  if(a.errors.length) return a.errors[0];
+  if(!state.model.start) return "Choose a start state.";
+  return "";
+}
+function resetSim(rerender = true){
+  if(sim.timer){ clearTimeout(sim.timer); sim.timer = null; }
+  if(sim.anim){ cancelAnimationFrame(sim.anim); sim.anim = null; }
+  cancelLayoutAnim();
+  sim.running = false; sim.active = false; sim.busy = false;
+  sim.cur = state.model?.start ?? null;
+  sim.steps = 0; sim.visits = new Map(); sim.path = [];
+  fxLayer.innerHTML = "";
+  updateSimHud();
+  if(rerender){
+    positionToken(); renderGraph();
+    if(state.ui.tab === "sim") renderSimTab(state.analysis);
+  }
+}
+function engageSim(){
+  if(sim.active) return true;
+  if(!simReady()) return false;
+  sim.cur = state.model.start;
+  sim.steps = 0;
+  sim.visits = new Map([[sim.cur, 1]]);
+  sim.path = [sim.cur];
+  sim.active = true;
+  positionToken();
+  renderGraphSimClasses();
+  updateSimHud();
+  return true;
+}
+function renderGraphSimClasses(){
+  for(const g of nodeLayer.children)
+    g.classList.toggle("is-current", sim.active && g.dataset.id === sim.cur);
+}
+function flashEdge(key){
+  for(const g of edgeLayer.children){
+    if(g.dataset.key === key){
+      g.classList.add("traversed");
+      setTimeout(() => g.classList.remove("traversed"), 450);
+      break;
+    }
+  }
+}
+function ensureToken(){
+  let tk = document.getElementById("sim-token");
+  if(!tk){
+    tk = document.createElementNS(SVGNS, "g");
+    tk.setAttribute("id", "sim-token");
+    tk.setAttribute("visibility", "hidden");
+    tk.innerHTML = '<circle class="tk-ring" r="9.5"></circle><circle class="tk" r="6"></circle>';
+    tokenLayer.appendChild(tk);
+  }
+  return tk;
+}
+function setTokenPos(x, y){ ensureToken().setAttribute("transform", `translate(${x} ${y})`); }
+function positionToken(){
+  const tk = ensureToken();
+  const node = sim.cur ? nodeById(sim.cur) : null;
+  if(!sim.active || !node){ tk.setAttribute("visibility", "hidden"); return; }
+  tk.setAttribute("visibility", "visible");
+  tk.setAttribute("transform", `translate(${node.x} ${node.y})`);
+}
+function animateToken(fromId, toId, done){
+  const f = nodeById(fromId), t = nodeById(toId);
+  if(!f || !t){ done(); return; }
+  ensureToken().setAttribute("visibility", "visible");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const dur = Math.max(110, 520 / simSpeed());
+  flashEdge(fromId + "|" + toId);
+  if(reduced){ setTokenPos(t.x, t.y); setTimeout(done, 30); return; }
+  const hasEdge = state.model.edges.some(e => e.from === fromId && e.to === toId);
+  if(!hasEdge && fromId === toId){ setTokenPos(f.x, f.y); setTimeout(done, dur * 0.55); return; }
+  const hasRev = fromId !== toId && state.model.edges.some(o => o.from === toId && o.to === fromId);
+  const geom = edgeGeometry(f, t, hasRev);
+  const meas = document.createElementNS(SVGNS, "path");
+  meas.setAttribute("d", geom.path);
+  meas.setAttribute("fill", "none"); meas.setAttribute("stroke", "none");
+  fxLayer.appendChild(meas);
+  const L = meas.getTotalLength();
+  const t0 = performance.now();
+  const ease = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+  const frame = now => {
+    const u = clamp((now - t0) / dur, 0, 1);
+    const pt = meas.getPointAtLength(L * ease(u));
+    setTokenPos(pt.x, pt.y);
+    if(u < 1){ sim.anim = requestAnimationFrame(frame); }
+    else{ meas.remove(); sim.anim = null; setTokenPos(t.x, t.y); done(); }
+  };
+  sim.anim = requestAnimationFrame(frame);
+}
+function commitStep(targetId){
+  sim.cur = targetId;
+  sim.steps += 1;
+  sim.visits.set(targetId, (sim.visits.get(targetId) || 0) + 1);
+  sim.path.push(targetId);
+  if(sim.path.length > 400) sim.path.shift();
+  const m = state.model;
+  return { hitX: m.xSet.has(targetId), hitY: m.ySet.has(targetId) && m.mode === "hit" };
+}
+function refreshSimUI(){
+  renderGraphSimClasses();
+  updateSimHud();
+  if(state.ui.tab === "sim") renderSimStats();
+}
+function hitToast(targetId, hitX){
+  toast(hitX
+    ? `Reached X (${labelFor(targetId)}) after ${sim.steps.toLocaleString("en-US")} steps.`
+    : `Reached Y (${labelFor(targetId)}) after ${sim.steps.toLocaleString("en-US")} steps.`, hitX ? "ok" : "warn");
+}
+function simStepOnce(done){
+  const a = state.analysis;
+  const i = nodeIndex(sim.cur);
+  if(i < 0 || !a?.P?.[i]){ pauseSim(); return; }
+  sim.busy = true;
+  const j = sampleRow(a.P[i]);
+  const targetId = state.model.nodes[j].id;
+  animateToken(sim.cur, targetId, () => {
+    sim.busy = false;
+    const r = commitStep(targetId);
+    refreshSimUI();
+    if(sim.running && sim.stopOnTarget && (r.hitX || r.hitY)){
+      pauseSim();
+      hitToast(targetId, r.hitX);
+    }
+    if(done) done();
+  });
+}
+function fastLoop(){
+  if(!sim.running) return;
+  const a = state.analysis;
+  const now = performance.now();
+  const dt = Math.min((now - (sim.lastTick || now)) / 1000, 0.25);
+  sim.lastTick = now;
+  sim.carry = (sim.carry || 0) + SIM_BASE_RATE * simSpeed() * dt;
+  let k = Math.min(Math.floor(sim.carry), 30000);
+  sim.carry -= k;
+  let stopped = false;
+  while(k-- > 0){
+    const i = nodeIndex(sim.cur);
+    if(i < 0 || !a?.P?.[i]){ pauseSim(); stopped = true; break; }
+    const j = sampleRow(a.P[i]);
+    const targetId = state.model.nodes[j].id;
+    const r = commitStep(targetId);
+    if(sim.stopOnTarget && (r.hitX || r.hitY)){
+      pauseSim();
+      hitToast(targetId, r.hitX);
+      stopped = true;
+      break;
+    }
+  }
+  positionToken();
+  refreshSimUI();
+  if(!stopped && sim.running) sim.timer = setTimeout(scheduleSim, 40);
+}
+function scheduleSim(){
+  if(!sim.running) return;
+  if(simSpeed() > SIM_ANIM_MAX_SPEED){
+    if(!sim.lastTick) sim.lastTick = performance.now() - 40;
+    fastLoop();
+  }else{
+    sim.lastTick = 0;
+    simStepOnce(() => {
+      if(sim.running) sim.timer = setTimeout(scheduleSim, Math.max(40, 150 / simSpeed()));
+    });
+  }
+}
+function playSim(){
+  if(sim.running){ pauseSim(); return; }
+  if(!engageSim()){ toast(simBlockReason() || "Fix the chain before simulating.", "warn"); return; }
+  sim.running = true;
+  sim.carry = 0;
+  sim.lastTick = 0;
+  updateSimControls(); updateSimHud();
+  scheduleSim();
+}
+function pauseSim(){
+  sim.running = false;
+  if(sim.timer){ clearTimeout(sim.timer); sim.timer = null; }
+  updateSimControls(); updateSimHud();
+}
+function stepSim(){
+  if(sim.running || sim.busy) return;
+  if(!engageSim()){ toast(simBlockReason() || "Fix the chain before simulating.", "warn"); return; }
+  simStepOnce(() => updateSimControls());
+}
+function updateSimHud(){
+  const hud = $("sim-hud");
+  if(!sim.active){ hud.hidden = true; return; }
+  hud.hidden = false;
+  hud.innerHTML = `<span class="dot"></span><span>Step <span class="mono">${sim.steps.toLocaleString("en-US")}</span> · ${escapeHtml(sim.cur ? labelFor(sim.cur) : "—")}</span>` +
+    (sim.running ? "" : `<span style="color:var(--muted)">· paused</span>`);
+}
+function updateSimControls(){
+  const ready = simReady();
+  const play = $("sim-play");
+  play.innerHTML = (sim.running ? ICONS.pause : ICONS.play) + (sim.running ? "Pause" : "Play");
+  play.disabled = !ready;
+  $("sim-step").disabled = !ready || sim.running;
+  $("sim-reset").disabled = !sim.active;
+  const spd = $("sim-speed");
+  if(document.activeElement !== spd) spd.value = String(sim.speed);
+  document.querySelectorAll("#speed-presets .chip").forEach(c =>
+    c.classList.toggle("on", +c.dataset.speed === sim.speed));
+}
+function renderSimTab(a){
+  updateSimControls();
+  $("sim-guard").innerHTML = simReady() ? "" :
+    `<div class="message warn" style="margin-bottom:10px">${ICONS.alert}<span>${escapeHtml(simBlockReason())}</span></div>`;
+  $("sim-stop-target").checked = sim.stopOnTarget;
+  renderSimStats();
+  renderMcHint();
+}
+function renderSimStats(){
+  $("sim-steps-count").textContent = sim.steps.toLocaleString("en-US");
+  $("sim-state-chip").textContent = sim.cur ? labelFor(sim.cur) : "—";
+  const pathBox = $("sim-path");
+  if(!sim.path.length){
+    pathBox.innerHTML = `<span class="hint">Start the simulation to see the walk's path.</span>`;
+  }else{
+    const shown = sim.path.slice(-14);
+    pathBox.innerHTML = (sim.path.length > 14 ? `<span class="arr">…</span>` : "") +
+      shown.map((id, k) =>
+        `${k ? '<span class="arr">→</span>' : ""}<span class="crumb${k === shown.length - 1 ? " current" : ""}">${escapeHtml(labelFor(id))}</span>`
+      ).join("");
+    pathBox.scrollLeft = pathBox.scrollWidth;
+  }
+  const box = $("sim-freq");
+  const total = [...sim.visits.values()].reduce((s, v) => s + v, 0);
+  if(!total){
+    box.innerHTML = `<div class="empty">Visit frequencies appear after a few steps.</div>`;
+    return;
+  }
+  const ref = state.analysis?.stationary?.full ?? null;
+  const items = state.model.nodes.map((n, i) => ({
+    label: displayLabel(n),
+    a: (sim.visits.get(n.id) || 0) / total,
+    b: ref ? ref[i] : null
+  }));
+  box.innerHTML = `<p class="hint" style="margin-bottom:4px">${total.toLocaleString("en-US")} visits recorded${ref ? " · compared with stationary π" : ""}</p>` +
+    pairedBars(items, "Empirical", "Stationary π");
+}
+
+/* ---------- Monte Carlo ---------- */
+let mcRunning = false;
+function renderMcHint(){
+  $("mc-hint").textContent = state.model.mode === "hit"
+    ? "Estimates P(X before Y) with independent random runs from the start state, then compares with the exact value."
+    : "Estimates E[steps to X] with independent random runs from the start state, then compares with the exact value.";
+}
+function runMonteCarlo(){
+  if(mcRunning) return;
+  const a = state.analysis, m = state.model;
+  if(!simReady() || !a.solve){
+    toast(a?.solveError || "First set up a valid computation in the Solve tab.", "warn");
+    return;
+  }
+  const trials = +$("mc-trials").value;
+  const cutoff = 20000;
+  const xIdx = a.xIdx;
+  const yIdx = m.mode === "hit" ? a.yIdx : new Set();
+  const startIdx = a.startIdx;
+  const P = a.P;
+  mcRunning = true;
+  const btn = $("mc-run");
+  btn.disabled = true;
+  let done = 0, hits = 0, misses = 0, truncated = 0, sumSteps = 0, sumSq = 0;
+  const chunk = () => {
+    const t0 = performance.now();
+    while(done < trials && performance.now() - t0 < 12){
+      let cur = startIdx, steps = 0, outcome = 0;
+      while(steps < cutoff){
+        if(xIdx.has(cur)){ outcome = 1; break; }
+        if(yIdx.has(cur)){ outcome = -1; break; }
+        cur = sampleRow(P[cur]);
+        steps += 1;
+      }
+      done += 1;
+      if(outcome === 1){ hits += 1; sumSteps += steps; sumSq += steps * steps; }
+      else if(outcome === -1) misses += 1;
+      else truncated += 1;
+    }
+    btn.textContent = `Running… ${Math.round(100 * done / trials)}%`;
+    if(done < trials) setTimeout(chunk, 0);
+    else{
+      mcRunning = false;
+      btn.disabled = false;
+      btn.textContent = "Run";
+      renderMcResult({ trials, hits, misses, truncated, sumSteps, sumSq });
+    }
+  };
+  chunk();
+}
+function renderMcResult(s){
+  const m = state.model, a = state.analysis;
+  const exact = a.solve?.startValue;
+  const box = $("mc-result");
+  const nf = n => n.toLocaleString("en-US");
+  if(m.mode === "hit"){
+    const p = s.hits / s.trials;
+    const ci = 1.96 * Math.sqrt(Math.max(p * (1 - p), 1e-12) / s.trials);
+    const diff = Number.isFinite(exact) ? Math.abs(p - exact) : null;
+    box.innerHTML = `<div class="result-card" style="margin-top:0">
+      <div class="result-label">Estimate from ${nf(s.trials)} runs</div>
+      <div class="mc-value">${fmtPct(p)} <span style="font-size:13px;color:var(--muted);font-family:var(--sans)">± ${fmtPct(ci)} (95%)</span></div>
+      <div class="mc-grid">
+        ${diff != null ? `<span>Exact: <b>${fmtPct(exact)}</b> · deviation: <b>${fmtPct(diff)}</b></span>` : ""}
+        <span>Reached X: <b>${nf(s.hits)}</b> · reached Y: <b>${nf(s.misses)}</b>${s.truncated ? ` · truncated at ${nf(20000)} steps: <b>${nf(s.truncated)}</b>` : ""}</span>
+      </div></div>`;
+  }else{
+    if(!s.hits){
+      box.innerHTML = `<div class="message warn">${ICONS.alert}<span>No run reached X within the step limit — the expected time is likely infinite.</span></div>`;
+      return;
+    }
+    const mean = s.sumSteps / s.hits;
+    const varr = Math.max(0, s.sumSq / s.hits - mean * mean);
+    const ci = 1.96 * Math.sqrt(varr / s.hits);
+    const diff = Number.isFinite(exact) ? Math.abs(mean - exact) : null;
+    box.innerHTML = `<div class="result-card" style="margin-top:0">
+      <div class="result-label">Estimate from ${nf(s.trials)} runs</div>
+      <div class="mc-value">${fmt(mean)} <span style="font-size:13px;color:var(--muted);font-family:var(--sans)">± ${fmt(ci)} steps (95%)</span></div>
+      <div class="mc-grid">
+        <span>Exact: <b>${fmtExp(exact)}</b>${diff != null ? ` · deviation: <b>${fmt(diff)}</b>` : ""}</span>
+        ${s.truncated ? `<span>Truncated runs (never reached X): <b>${nf(s.truncated)}</b> — excluded from the mean.</span>` : ""}
+      </div></div>`;
+  }
+}
+
+/* ---------- canvas interactions ---------- */
+let drag = null;
+function nodeAtPoint(w){
+  for(let i = state.model.nodes.length - 1; i >= 0; i--){
+    const n = state.model.nodes[i];
+    if(Math.hypot(n.x - w.x, n.y - w.y) <= NODE_R + 9) return n;
+  }
+  return null;
+}
+function drawDraft(fromNode, w){
+  fxLayer.innerHTML = `<path class="draft-edge" d="M ${fromNode.x} ${fromNode.y} L ${w.x} ${w.y}"></path>`;
+}
+function createEdgeInteractive(from, to){
+  const key = from + "|" + to;
+  const existing = state.model.edges.find(e => e.from === from && e.to === to);
+  if(existing){
+    state.ui.selection = { type: "edge", key };
+    render();
+    openEdgeEditor(key);
+    return;
+  }
+  const rest = remainingMass(from);
+  upsertEdge(from, to, rest > EPS ? rest : 0.5);
+  requestAnimationFrame(() => openEdgeEditor(key));
+}
+function handleConnectClick(id){
+  if(!state.ui.connectFrom){
+    state.ui.connectFrom = id;
+    renderGraph(); renderInspector();
+    return;
+  }
+  const from = state.ui.connectFrom;
+  state.ui.connectFrom = null;
+  createEdgeInteractive(from, id);
+}
+function toggleConnectMode(force){
+  state.ui.connectMode = force ?? !state.ui.connectMode;
+  state.ui.connectFrom = null;
+  const b = $("btn-connect");
+  b.setAttribute("aria-pressed", String(state.ui.connectMode));
+  svg.classList.toggle("connecting", state.ui.connectMode);
+  renderInspector(); renderGraph();
+}
+svg.addEventListener("pointerdown", (e) => {
+  if(e.button !== 0) return;
+  closeEdgeEditor(false);
+  const nodeG = e.target.closest(".node");
+  if(nodeG){
+    cancelLayoutAnim();
+    const id = nodeG.dataset.id;
+    if(e.shiftKey){
+      drag = { type: "draft", from: id };
+      svg.setPointerCapture(e.pointerId);
+      return;
+    }
+    const node = nodeById(id);
+    const w = pointerToWorld(e);
+    drag = { type: "node", id, dx: w.x - node.x, dy: w.y - node.y,
+             sx: e.clientX, sy: e.clientY, moved: false, snapped: false };
+    svg.setPointerCapture(e.pointerId);
+    return;
+  }
+  if(e.target.closest(".edge")) return;
+  const p0 = svgPoint(e);
+  drag = { type: "pan", px0: p0.x, py0: p0.y, vx: state.ui.view.x, vy: state.ui.view.y,
+           sx: e.clientX, sy: e.clientY, moved: false };
+  svg.classList.add("panning");
+  svg.setPointerCapture(e.pointerId);
+});
+svg.addEventListener("pointermove", (e) => {
+  if(!drag) return;
+  if(drag.type === "node"){
+    if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+    drag.moved = true;
+    if(!drag.snapped){ recordSnapshot(); drag.snapped = true; }
+    const node = nodeById(drag.id);
+    if(!node) return;
+    const w = pointerToWorld(e);
+    node.x = Math.round(w.x - drag.dx);
+    node.y = Math.round(w.y - drag.dy);
+    node.pinned = true;
+    renderGraph();
+  }else if(drag.type === "pan"){
+    if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+    drag.moved = true;
+    const p = svgPoint(e);
+    state.ui.view.x = drag.vx + (p.x - drag.px0);
+    state.ui.view.y = drag.vy + (p.y - drag.py0);
+    applyView();
+  }else if(drag.type === "draft"){
+    const f = nodeById(drag.from);
+    if(f) drawDraft(f, pointerToWorld(e));
+  }
+});
+function endDrag(e){
+  if(!drag) return;
+  const d = drag;
+  drag = null;
+  svg.classList.remove("panning");
+  if(d.type === "node"){
+    if(d.moved){ saveLocal(); render(); }
+    else if(state.ui.connectMode){ handleConnectClick(d.id); }
+    else{
+      state.ui.selection = { type: "node", id: d.id };
+      render();
+    }
+  }else if(d.type === "pan"){
+    if(!d.moved){
+      state.ui.selection = null;
+      state.ui.connectFrom = null;
+      render();
+    }
+  }else if(d.type === "draft"){
+    fxLayer.innerHTML = "";
+    const target = e ? nodeAtPoint(pointerToWorld(e)) : null;
+    if(target) createEdgeInteractive(d.from, target.id);
+  }
+}
+svg.addEventListener("pointerup", endDrag);
+svg.addEventListener("pointercancel", () => { const d = drag; drag = null; svg.classList.remove("panning"); if(d?.type === "draft") fxLayer.innerHTML = ""; });
+svg.addEventListener("dblclick", (e) => {
+  const edgeG = e.target.closest(".edge");
+  if(edgeG){
+    e.preventDefault();
+    state.ui.selection = { type: "edge", key: edgeG.dataset.key };
+    render();
+    openEdgeEditor(edgeG.dataset.key);
+    return;
+  }
+  if(e.target.closest(".node")) return;
+  const w = pointerToWorld(e);
+  addNodeAt(w.x, w.y);
+});
+edgeLayer.addEventListener("click", (e) => {
+  const g = e.target.closest(".edge");
+  if(!g) return;
+  e.stopPropagation();
+  state.ui.selection = { type: "edge", key: g.dataset.key };
+  state.ui.connectFrom = null;
+  render();
+});
+$("graph-wrap").addEventListener("wheel", (e) => {
+  e.preventDefault();
+  zoomAt(Math.exp(-e.deltaY * 0.0012), e.clientX, e.clientY);
+}, { passive: false });
+
+/* inline editor */
+$("inline-editor-input").addEventListener("keydown", (e) => {
+  if(e.key === "Enter"){ e.preventDefault(); closeEdgeEditor(true); }
+  else if(e.key === "Escape"){ e.stopPropagation(); closeEdgeEditor(false); }
+});
+$("inline-editor-input").addEventListener("blur", () => closeEdgeEditor(true));
+
+/* ---------- toolbar ---------- */
+$("btn-add-node").addEventListener("click", addNodeAuto);
+$("btn-connect").addEventListener("click", () => toggleConnectMode());
+$("btn-layout").addEventListener("click", autoLayout);
+$("btn-fit").addEventListener("click", fitView);
+$("btn-zoom-in").addEventListener("click", () => zoomCenter(1.25));
+$("btn-zoom-out").addEventListener("click", () => zoomCenter(0.8));
+$("btn-clear").addEventListener("click", () => {
+  if(!state.model.nodes.length) return;
+  if(!confirm("Delete the entire chain? You can undo with Ctrl+Z.")) return;
+  apply(() => { state.model = blankModel(); });
+});
+
+/* ---------- header ---------- */
+$("btn-undo").addEventListener("click", undo);
+$("btn-redo").addEventListener("click", redo);
+$("btn-theme").addEventListener("click", () =>
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+$("preset-select").addEventListener("change", () => {
+  const v = $("preset-select").value;
+  if(!v || !PRESETS[v]) return;
+  apply(() => {
+    state.model = PRESETS[v]();
+    state.ui.selection = null;
+    state.ui.connectFrom = null;
+  });
+  $("preset-select").value = "";
+  fitView();
+  toast("Example loaded.", "ok");
+});
+$("btn-export").addEventListener("click", () => {
+  const data = { app: "markov-chain-studio", version: 2, ...serializeModel(state.model) };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "markov-chain.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast("Chain exported as JSON.", "ok");
+});
+$("btn-import").addEventListener("click", () => $("file-input").click());
+$("file-input").addEventListener("change", async () => {
+  const f = $("file-input").files[0];
+  $("file-input").value = "";
+  if(!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    const model = hydrateModel(data.model ?? data);
+    apply(() => {
+      state.model = model;
+      state.ui.selection = null;
+      state.ui.connectFrom = null;
+    });
+    fitView();
+    toast("Chain imported.", "ok");
+  }catch(err){
+    toast("Import failed: " + (err.message || "invalid file"), "warn");
+  }
+});
+
+/* ---------- help modal ---------- */
+let lastFocus = null;
+function openHelp(){
+  lastFocus = document.activeElement;
+  $("help-modal").hidden = false;
+  $("btn-help-close").focus();
+}
+function closeHelp(){
+  $("help-modal").hidden = true;
+  if(lastFocus?.focus) lastFocus.focus();
+}
+$("btn-help").addEventListener("click", openHelp);
+$("btn-help-close").addEventListener("click", closeHelp);
+$("help-modal").addEventListener("click", (e) => { if(e.target === $("help-modal")) closeHelp(); });
+
+/* ---------- tabs & Solve panel ---------- */
+document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+function lightChange(fn){ fn(); sanitizeModel(state.model); resetSim(false); saveLocal(); render(); }
+$("mode-seg").addEventListener("click", (e) => {
+  const b = e.target.closest(".seg-btn");
+  if(!b || b.dataset.mode === state.model.mode) return;
+  lightChange(() => { state.model.mode = b.dataset.mode; });
+});
+$("start-select").addEventListener("change", () => {
+  apply(() => { state.model.start = $("start-select").value; });
+});
+for(const boxId of ["xset-chips", "yset-chips"]){
+  $(boxId).addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip[data-id]");
+    if(!chip || chip.disabled) return;
+    toggleRole(chip.dataset.id, chip.dataset.set);
+  });
+}
+$("autoloop").addEventListener("change", () => {
+  lightChange(() => { state.model.autoLoop = $("autoloop").checked; });
+});
+$("heat-toggle").addEventListener("change", () => {
+  state.ui.heat = $("heat-toggle").checked;
+  saveLocal();
+  renderGraph();
+});
+
+/* ---------- Distributions panel ---------- */
+$("evo-steps").addEventListener("input", () => {
+  state.ui.evoSteps = clamp(+$("evo-steps").value || 30, 5, 200);
+  $("evo-steps-out").textContent = state.ui.evoSteps;
+  saveLocal();
+  if(state.ui.tab === "dist") renderDistTab(state.analysis);
+});
+$("evo-dist0").addEventListener("change", () => {
+  state.ui.evoDist = $("evo-dist0").value === "uniform" ? "uniform" : "start";
+  saveLocal();
+  if(state.ui.tab === "dist") renderDistTab(state.analysis);
+});
+
+/* ---------- Simulation panel ---------- */
+$("sim-play").addEventListener("click", playSim);
+$("sim-step").addEventListener("click", stepSim);
+$("sim-reset").addEventListener("click", () => resetSim(true));
+$("sim-speed").addEventListener("change", () => setSimSpeed(+$("sim-speed").value));
+$("sim-speed").addEventListener("keydown", (e) => { if(e.key === "Enter") $("sim-speed").blur(); });
+$("speed-presets").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip[data-speed]");
+  if(chip) setSimSpeed(+chip.dataset.speed);
+});
+$("sim-stop-target").addEventListener("change", () => {
+  sim.stopOnTarget = $("sim-stop-target").checked;
+});
+$("mc-run").addEventListener("click", runMonteCarlo);
+
+/* ---------- Matrix panel ---------- */
+$("matrix-box").addEventListener("change", (e) => {
+  const input = e.target.closest("input.cell");
+  if(!input) return;
+  const [from, to] = input.dataset.cell.split("|");
+  const raw = input.value.trim();
+  const p = raw === "" ? 0 : +raw;
+  if(!Number.isFinite(p) || p < 0 || p > 1){
+    toast("The probability must be between 0 and 1.", "warn");
+    renderMatrixTab(state.analysis);
+    return;
+  }
+  upsertEdge(from, to, Math.round(p * 1e6) / 1e6, false);
+});
+async function copyText(txt, label){
+  try{
+    await navigator.clipboard.writeText(txt);
+    toast(label + " — copied to clipboard.", "ok");
+  }catch(err){
+    const ta = document.createElement("textarea");
+    ta.value = txt;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand("copy"); toast(label + " — copied to clipboard.", "ok"); }
+    catch(e2){ toast("Copy failed.", "warn"); }
+    ta.remove();
+  }
+}
+function cellNum(v){ return (Math.round(v * 1e6) / 1e6).toString(); }
+$("btn-copy-csv").addEventListener("click", () => {
+  const a = state.analysis;
+  if(!a?.n || a.errors.length){ toast("The matrix is not valid.", "warn"); return; }
+  const lines = ["," + a.labels.map(l => `"${l.replaceAll('"', '""')}"`).join(",")];
+  a.P.forEach((row, i) => lines.push(`"${a.labels[i].replaceAll('"', '""')}",` + row.map(cellNum).join(",")));
+  copyText(lines.join("\n"), "Effective matrix (CSV)");
+});
+$("btn-copy-latex").addEventListener("click", () => {
+  const a = state.analysis;
+  if(!a?.n || a.errors.length){ toast("The matrix is not valid.", "warn"); return; }
+  const body = a.P.map(row => "  " + row.map(cellNum).join(" & ")).join(" \\\\\n");
+  copyText("P = \\begin{pmatrix}\n" + body + "\n\\end{pmatrix}", "Effective matrix (LaTeX)");
+});
+
+/* ---------- keyboard ---------- */
+function deleteSelection(){
+  const sel = state.ui.selection;
+  if(!sel) return;
+  if(sel.type === "node") deleteNode(sel.id);
+  else deleteEdge(sel.key);
+}
+function roleShortcut(role){
+  const sel = state.ui.selection;
+  if(sel?.type !== "node") return;
+  if(role === "start") apply(() => { state.model.start = sel.id; });
+  else toggleRole(sel.id, role);
+}
+document.addEventListener("keydown", (e) => {
+  if(e.key === "Escape"){
+    if(!$("help-modal").hidden){ closeHelp(); return; }
+    if(!$("inline-editor").hidden){ closeEdgeEditor(false); return; }
+    if(state.ui.connectMode){ toggleConnectMode(false); return; }
+    if(state.ui.selection){ state.ui.selection = null; render(); }
+    return;
+  }
+  if(e.target.matches("input, select, textarea")) return;
+  const k = e.key.toLowerCase();
+  if((e.ctrlKey || e.metaKey) && k === "z" && !e.shiftKey){ e.preventDefault(); undo(); return; }
+  if((e.ctrlKey || e.metaKey) && (k === "y" || (k === "z" && e.shiftKey))){ e.preventDefault(); redo(); return; }
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  if(e.key === "?"){ openHelp(); return; }
+  switch(k){
+    case "n": addNodeAuto(); break;
+    case "e": toggleConnectMode(); break;
+    case "f": fitView(); break;
+    case "p": playSim(); break;
+    case "s": roleShortcut("start"); break;
+    case "x": roleShortcut("x"); break;
+    case "y": roleShortcut("y"); break;
+    case "delete":
+    case "backspace": e.preventDefault(); deleteSelection(); break;
+  }
+});
+
+/* ---------- resize ---------- */
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => renderActiveTab(), 200);
+});
+
+/* ---------- self-tests (console) ---------- */
+function approxEq(name, actual, expected, tol = 1e-9){
+  if(!Number.isFinite(actual) || Math.abs(actual - expected) > tol)
+    throw new Error(`${name}: expected ${expected}, got ${actual}`);
+}
+function runMarkovSelfTests(){
+  const labels = ["0","H","T","HH","TH","HHT","THH","HHTH","THHT","HHTHH","THHTH"];
+  const L = new Map(labels.map((l, i) => [l, i]));
+  const n = labels.length;
+  const P = Array.from({ length: n }, () => new Array(n).fill(0));
+  const add = (f, t, p = 0.5) => { P[L.get(f)][L.get(t)] += p; };
+  add("0","H"); add("0","T"); add("H","HH"); add("H","T"); add("T","TH"); add("T","T");
+  add("HH","HH"); add("HH","HHT"); add("TH","THH"); add("TH","T"); add("HHT","HHTH"); add("HHT","T");
+  add("THH","HH"); add("THH","THHT"); add("HHTH","HHTHH"); add("HHTH","T"); add("THHT","THHTH"); add("THHT","T");
+  add("HHTHH","HHTHH",1); add("THHTH","THHTH",1);
+  const hit = solveHitPure(P, L.get("0"), new Set([L.get("HHTHH")]), new Set([L.get("THHTH")]));
+  const hitExp = { "0": 3/8, H: 5/12, T: 1/3, HH: 1/2, TH: 1/3, HHT: 1/2, THH: 1/3, HHTH: 2/3, THHT: 1/6, HHTHH: 1, THHTH: 0 };
+  for(const [lab, v] of Object.entries(hitExp)) approxEq("hit " + lab, hit.values[L.get(lab)], v);
+  const exp = solveExpectedPure(P, L.get("0"), new Set([L.get("HHTHH"), L.get("THHTH")]));
+  const expExp = { "0": 51/2, H: 73/3, T: 74/3, HH: 22, TH: 68/3, HHT: 20, THH: 56/3, HHTH: 40/3, THHT: 40/3, HHTHH: 0, THHTH: 0 };
+  for(const [lab, v] of Object.entries(expExp)) approxEq("expected " + lab, exp.values[L.get(lab)], v);
+  const G = [[1,0,0,0,0,0],[.5,0,.5,0,0,0],[0,.5,0,.5,0,0],[0,0,.5,0,.5,0],[0,0,0,.5,0,.5],[0,0,0,0,0,1]];
+  approxEq("gambler P(win|2)", solveHitPure(G, 2, new Set([5]), new Set([0])).startValue, 2/5);
+  approxEq("gambler E[duration|2]", solveExpectedPure(G, 2, new Set([0, 5])).startValue, 6);
+  const W = [[.7,.3],[.6,.4]];
+  const piW = stationaryForClass(W, [0, 1]);
+  approxEq("π₀", piW[0], 2/3); approxEq("π₁", piW[1], 1/3);
+  const C = [[0,1,0,0],[0,0,1,0],[0,0,0,1],[1,0,0,0]];
+  const clsC = classify(C);
+  if(!clsC.irreducible || clsC.period[0] !== 4) throw new Error("cycle period: expected d=4");
+  const piC = stationaryForClass(C, [0,1,2,3]);
+  piC.forEach((v, i) => approxEq("π cycle " + i, v, 0.25));
+  const I = [[.5,.5,0],[0,1,0],[0,0,1]];
+  const inf = solveExpectedPure(I, 0, new Set([2]));
+  if(inf.values[0] !== Infinity || inf.values[1] !== Infinity) throw new Error("infinite-time detection failed");
+  const clsI = classify(I);
+  if(clsI.comps.length !== 3 || clsI.irreducible) throw new Error("classification: expected 3 classes");
+  return { hit: hit.startValue, expected: exp.startValue, residual: Math.max(hit.residual, exp.residual) };
+}
+window.runMarkovSelfTests = runMarkovSelfTests;
+try{
+  window.markovSelfTest = runMarkovSelfTests();
+  console.info("[Markov self-test] passed", window.markovSelfTest);
+}catch(err){
+  console.error("[Markov self-test] FAILED", err);
+}
+
+/* ---------- init ---------- */
+(function init(){
+  const saved = loadLocal();
+  if(saved){
+    state.model = saved.model;
+    if(["solve","dist","sim","matrix"].includes(saved.ui.tab)) state.ui.tab = saved.ui.tab;
+    state.ui.heat = saved.ui.heat !== false;
+    state.ui.evoSteps = clamp(+saved.ui.evoSteps || 30, 5, 200);
+    state.ui.evoDist = saved.ui.evoDist === "uniform" ? "uniform" : "start";
+    if(Number.isFinite(+saved.ui.simSpeed) && +saved.ui.simSpeed > 0)
+      sim.speed = clamp(+saved.ui.simSpeed, 0.25, 10000);
+  }else{
+    state.model = PRESETS.simple();
+  }
+  sanitizeModel(state.model);
+  renderThemeButton();
+  resetSim(false);
+  applyView();
+  document.querySelectorAll(".tab-btn").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === state.ui.tab)));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === "tab-" + state.ui.tab));
+  updateSimControls();
+  render();
+  requestAnimationFrame(() => fitView());
+})();
+
+</script>
+</body>
+</html>
